@@ -10,6 +10,7 @@ func NewRootCmd() *cobra.Command {
 		Short: "Local-first task graph and execution tracker for AI agents",
 	}
 	cmd.AddCommand(newInitCmd())
+	cmd.AddCommand(newIssueCmd())
 	cmd.AddCommand(newLabelCmd())
 	cmd.AddCommand(newAgentCmd())
 	return cmd

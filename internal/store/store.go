@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"sort"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -146,4 +147,294 @@ func (s *Store) ListLabels() ([]Label, error) {
 
 func (s *Store) DB() *sql.DB {
 	return s.db
+}
+
+type Issue struct {
+	ID            int      `json:"id"`
+	Title         string   `json:"title"`
+	Body          string   `json:"body"`
+	State         string   `json:"state"`
+	Kind          string   `json:"kind"`
+	ParentIssueID *int     `json:"parent_issue_id"`
+	Labels        []Label  `json:"labels"`
+	CreatedAt     string   `json:"created_at"`
+	UpdatedAt     string   `json:"updated_at"`
+	ClosedAt      *string  `json:"closed_at"`
+}
+
+type UpdateIssueOptions struct {
+	Title        *string  `json:"title,omitempty"`
+	Body         *string  `json:"body,omitempty"`
+	State        *string  `json:"state,omitempty"`
+	Kind         *string  `json:"kind,omitempty"`
+	AddLabels    []string `json:"add_labels,omitempty"`
+	RemoveLabels []string `json:"remove_labels,omitempty"`
+}
+
+func (s *Store) ResolveLabel(name string) (*Label, error) {
+	var l Label
+	err := s.db.QueryRow(
+		"SELECT id, name, color, description, kind FROM labels WHERE name = ?", name,
+	).Scan(&l.ID, &l.Name, &l.Color, &l.Description, &l.Kind)
+	if err == nil {
+		return &l, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("resolve label %s: %w", name, err)
+	}
+
+	_, execErr := s.db.Exec(
+		"INSERT OR IGNORE INTO labels (name, color, description, kind) VALUES (?, 'ffffff', '', 'custom')", name,
+	)
+	if execErr != nil {
+		return nil, fmt.Errorf("create label %s: %w", name, execErr)
+	}
+
+	err = s.db.QueryRow(
+		"SELECT id, name, color, description, kind FROM labels WHERE name = ?", name,
+	).Scan(&l.ID, &l.Name, &l.Color, &l.Description, &l.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("re-query label %s: %w", name, err)
+	}
+	return &l, nil
+}
+
+func (s *Store) getIssueLabels(issueID int) ([]Label, error) {
+	rows, err := s.db.Query(
+		`SELECT l.id, l.name, l.color, l.description, l.kind
+		 FROM labels l
+		 JOIN issue_labels il ON l.id = il.label_id
+		 WHERE il.issue_id = ?
+		 ORDER BY l.id`, issueID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get labels for issue %d: %w", issueID, err)
+	}
+	defer rows.Close()
+	var labels []Label
+	for rows.Next() {
+		var l Label
+		if err := rows.Scan(&l.ID, &l.Name, &l.Color, &l.Description, &l.Kind); err != nil {
+			return nil, fmt.Errorf("scan label: %w", err)
+		}
+		labels = append(labels, l)
+	}
+	return labels, rows.Err()
+}
+
+func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (*Issue, error) {
+	result, err := s.db.Exec(
+		"INSERT INTO issues (title, kind, body) VALUES (?, ?, ?)",
+		title, kind, body,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create issue: %w", err)
+	}
+	id, _ := result.LastInsertId()
+	intID := int(id)
+
+	for _, name := range labelNames {
+		label, err := s.ResolveLabel(name)
+		if err != nil {
+			return nil, err
+		}
+		if label.Kind == "triage" {
+			_, err = s.db.Exec(
+				`DELETE FROM issue_labels
+				 WHERE issue_id = ? AND label_id IN (
+					 SELECT id FROM labels WHERE kind = 'triage'
+				 )`, intID,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("remove existing triage labels: %w", err)
+			}
+		}
+		_, err = s.db.Exec(
+			"INSERT OR IGNORE INTO issue_labels (issue_id, label_id) VALUES (?, ?)",
+			intID, label.ID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("attach label %s: %w", name, err)
+		}
+	}
+
+	return s.GetIssue(intID)
+}
+
+func (s *Store) GetIssue(id int) (*Issue, error) {
+	row := s.db.QueryRow(
+		`SELECT id, title, body, state, kind, parent_issue_id, created_at, updated_at, closed_at
+		 FROM issues WHERE id = ?`, id,
+	)
+	var issue Issue
+	err := row.Scan(&issue.ID, &issue.Title, &issue.Body, &issue.State, &issue.Kind, &issue.ParentIssueID, &issue.CreatedAt, &issue.UpdatedAt, &issue.ClosedAt)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("issue %d not found", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get issue %d: %w", id, err)
+	}
+	labels, err := s.getIssueLabels(issue.ID)
+	if err != nil {
+		return nil, err
+	}
+	issue.Labels = labels
+	return &issue, nil
+}
+
+func (s *Store) ListIssues(state, kind, label string) ([]Issue, error) {
+	query := `SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at FROM issues i`
+	var args []interface{}
+	var conditions []string
+
+	if label != "" {
+		query += ` JOIN issue_labels il ON i.id = il.issue_id JOIN labels l ON il.label_id = l.id`
+		conditions = append(conditions, "l.name = ?")
+		args = append(args, label)
+	}
+	if state != "" {
+		conditions = append(conditions, "i.state = ?")
+		args = append(args, state)
+	}
+	if kind != "" {
+		conditions = append(conditions, "i.kind = ?")
+		args = append(args, kind)
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	query += " ORDER BY i.id"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list issues: %w", err)
+	}
+	defer rows.Close()
+	var issues []Issue
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+			return nil, fmt.Errorf("scan issue: %w", err)
+		}
+		issues = append(issues, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for idx := range issues {
+		labels, err := s.getIssueLabels(issues[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+		issues[idx].Labels = labels
+	}
+	return issues, nil
+}
+
+func (s *Store) UpdateIssue(id int, opts UpdateIssueOptions) error {
+	var setClauses []string
+	var args []interface{}
+
+	if opts.Title != nil {
+		setClauses = append(setClauses, "title = ?")
+		args = append(args, *opts.Title)
+	}
+	if opts.Body != nil {
+		setClauses = append(setClauses, "body = ?")
+		args = append(args, *opts.Body)
+	}
+	if opts.Kind != nil {
+		setClauses = append(setClauses, "kind = ?")
+		args = append(args, *opts.Kind)
+	}
+	if opts.State != nil {
+		setClauses = append(setClauses, "state = ?")
+		args = append(args, *opts.State)
+		if *opts.State == "closed" {
+			setClauses = append(setClauses, "closed_at = datetime('now')")
+		} else if *opts.State == "open" {
+			setClauses = append(setClauses, "closed_at = NULL")
+		}
+	}
+
+	if len(setClauses) == 0 && len(opts.AddLabels) == 0 && len(opts.RemoveLabels) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	if len(setClauses) > 0 {
+		setClauses = append(setClauses, "updated_at = datetime('now')")
+		query := "UPDATE issues SET " + strings.Join(setClauses, ", ") + " WHERE id = ?"
+		args = append(args, id)
+		result, err := s.db.Exec(query, args...)
+		if err != nil {
+			return fmt.Errorf("update issue %d: %w", id, err)
+		}
+		n, _ := result.RowsAffected()
+		if n == 0 {
+			return fmt.Errorf("issue %d not found", id)
+		}
+	}
+
+	if len(opts.AddLabels) > 0 || len(opts.RemoveLabels) > 0 {
+		if err := s.UpdateIssueLabels(id, opts.AddLabels, opts.RemoveLabels); err != nil {
+			return err
+		}
+		if len(setClauses) == 0 {
+			_, err := s.db.Exec("UPDATE issues SET updated_at = datetime('now') WHERE id = ?", id)
+			if err != nil {
+				return fmt.Errorf("update issue timestamp: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Store) UpdateIssueLabels(issueID int, addLabels, removeLabels []string) error {
+	for _, name := range removeLabels {
+		_, err := s.db.Exec(
+			"DELETE FROM issue_labels WHERE issue_id = ? AND label_id IN (SELECT id FROM labels WHERE name = ?)",
+			issueID, name,
+		)
+		if err != nil {
+			return fmt.Errorf("remove label %s: %w", name, err)
+		}
+	}
+
+	for _, name := range addLabels {
+		label, err := s.ResolveLabel(name)
+		if err != nil {
+			return err
+		}
+		if label.Kind == "triage" {
+			_, err = s.db.Exec(
+				`DELETE FROM issue_labels
+				 WHERE issue_id = ? AND label_id IN (
+					 SELECT id FROM labels WHERE kind = 'triage'
+				 )`, issueID,
+			)
+			if err != nil {
+				return fmt.Errorf("remove existing triage labels: %w", err)
+			}
+		}
+		_, err = s.db.Exec(
+			"INSERT OR IGNORE INTO issue_labels (issue_id, label_id) VALUES (?, ?)",
+			issueID, label.ID,
+		)
+		if err != nil {
+			return fmt.Errorf("add label %s: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Store) CloseIssue(id int) error {
+	state := "closed"
+	return s.UpdateIssue(id, UpdateIssueOptions{State: &state})
+}
+
+func (s *Store) ReopenIssue(id int) error {
+	state := "open"
+	return s.UpdateIssue(id, UpdateIssueOptions{State: &state})
 }
