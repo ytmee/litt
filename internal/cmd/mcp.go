@@ -3,8 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -41,22 +39,14 @@ func newMCPIssue(issue *store.Issue) mcpIssueResponse {
 	}
 }
 
-func 	newMCPCmd() *cobra.Command {
-	var dbPath string
+func newMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Start an MCP stdio server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := dbPath
-			if path == "" {
-				path = filepath.Join(".litt", "litt.db")
-			}
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				return fmt.Errorf("database not found at %s; run 'litt init' first or use --db", path)
-			}
-			s, err := store.Open(path)
+			s, err := openStore(cmd)
 			if err != nil {
-				return fmt.Errorf("open store: %w", err)
+				return err
 			}
 			defer s.Close()
 
@@ -64,7 +54,6 @@ func 	newMCPCmd() *cobra.Command {
 			return server.Run(cmd.Context(), &mcp.StdioTransport{})
 		},
 	}
-	cmd.Flags().StringVar(&dbPath, "db", "", "Path to litt database (auto-detect by default)")
 	return cmd
 }
 

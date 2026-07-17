@@ -1171,6 +1171,163 @@ func TestIssueReadyNoLabel(t *testing.T) {
 	}
 }
 
+func TestFeatureCreate(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "feature", "create", "My feature", "--body", "details")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Created issue #1") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !strings.Contains(out, "My feature") {
+		t.Fatalf("feature title missing: %s", out)
+	}
+}
+
+func TestFeatureCreateDefaultsToFeatureKind(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runCmd(t, "feature", "create", "My feature"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "show", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "feature") {
+		t.Fatal("feature create should default to kind=feature")
+	}
+}
+
+func TestFeatureList(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "feature", "create", "Feature 1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Task 1", "--kind", "task"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "feature", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Feature 1") {
+		t.Fatalf("expected feature in output: %s", out)
+	}
+	if strings.Contains(out, "Task 1") {
+		t.Fatal("task should not appear in feature list")
+	}
+}
+
+func TestFeatureListJSON(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "feature", "create", "Feature JSON"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "feature", "list", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(out), "[") {
+		t.Fatal("JSON output does not start with [")
+	}
+	if !strings.Contains(out, `"kind": "feature"`) {
+		t.Fatal("JSON output missing feature kind")
+	}
+}
+
+func TestInitWithDBFlag(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	customDB := filepath.Join(dir, "custom", "data.db")
+
+	out, err := runCmd(t, "init", "--db", customDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Initialized") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if _, err := os.Stat(customDB); os.IsNotExist(err) {
+		t.Fatal("custom db was not created")
+	}
+}
+
+func TestUpwardDiscovery(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	subDir := filepath.Join(dir, "a", "b", "c")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	defer chdir(t, subDir)()
+
+	out, err := runCmd(t, "issue", "list")
+	if err != nil {
+		t.Fatalf("expected success from subdirectory, got: %v", err)
+	}
+	if !strings.Contains(out, "No issues found") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestDBFlagOverridesDiscovery(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	customDir := filepath.Join(dir, "custom")
+	customDB := filepath.Join(customDir, "data.db")
+
+	if _, err := runCmd(t, "init", "--db", customDB); err != nil {
+		t.Fatal(err)
+	}
+
+	subDir := filepath.Join(dir, "a", "b")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	defer chdir(t, subDir)()
+
+	out, err := runCmd(t, "issue", "list", "--db", customDB)
+	if err != nil {
+		t.Fatalf("expected success with --db, got: %v", err)
+	}
+	if !strings.Contains(out, "No issues found") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
 func TestIssueNoInit(t *testing.T) {
 	dir := t.TempDir()
 	defer chdir(t, dir)()

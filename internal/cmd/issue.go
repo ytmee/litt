@@ -3,8 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -33,18 +31,6 @@ func newIssueCmd() *cobra.Command {
 	return cmd
 }
 
-func openStore() (*store.Store, error) {
-	dbPath := filepath.Join(".litt", "litt.db")
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("not a litt repository (no .litt/litt.db found); run 'litt init' first")
-	}
-	s, err := store.Open(dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
-	}
-	return s, nil
-}
-
 func parseIssueNumber(s string) (int, error) {
 	s = strings.TrimPrefix(s, "#")
 	id, err := strconv.Atoi(s)
@@ -64,7 +50,7 @@ func newIssueCreateCmd() *cobra.Command {
 		Short: "Create a new issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -94,7 +80,7 @@ func newIssueListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List issues",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -158,7 +144,7 @@ func newIssueShowCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -228,7 +214,7 @@ func newIssueUpdateCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -278,7 +264,7 @@ func newIssueCloseCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -304,7 +290,7 @@ func newIssueReopenCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -338,7 +324,7 @@ func newIssueParentCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -361,7 +347,7 @@ func newIssueParentCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -388,7 +374,7 @@ func newIssueChildrenCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -436,7 +422,7 @@ func newIssueBlockCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -466,7 +452,7 @@ func newIssueUnblockCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -492,7 +478,7 @@ func newIssueBlockedByCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -528,7 +514,7 @@ func newIssueBlockingCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -560,7 +546,7 @@ func newIssueReadyCmd() *cobra.Command {
 		Use:   "ready",
 		Short: "List issues ready for an agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := openStore()
+			s, err := openStore(cmd)
 			if err != nil {
 				return err
 			}

@@ -3,11 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/ytmee/litt/internal/store"
 )
 
 func newLabelCmd() *cobra.Command {
@@ -25,13 +22,9 @@ func newLabelListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all labels",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dbPath := filepath.Join(".litt", "litt.db")
-			if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-				return fmt.Errorf("not a litt repository (no .litt/litt.db found); run 'litt init' first")
-			}
-			s, err := store.Open(dbPath)
+			s, err := openStore(cmd)
 			if err != nil {
-				return fmt.Errorf("open store: %w", err)
+				return err
 			}
 			defer s.Close()
 			labels, err := s.ListLabels()

@@ -9,8 +9,10 @@ func NewRootCmd() *cobra.Command {
 		Use:   "litt",
 		Short: "Local-first task graph and execution tracker for AI agents",
 	}
+	cmd.PersistentFlags().String("db", "", "Path to litt database (auto-detected by default)")
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newIssueCmd())
+	cmd.AddCommand(newFeatureCmd())
 	cmd.AddCommand(newLabelCmd())
 	cmd.AddCommand(newAgentCmd())
 	cmd.AddCommand(newMCPCmd())
