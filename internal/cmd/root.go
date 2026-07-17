@@ -13,5 +13,6 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newIssueCmd())
 	cmd.AddCommand(newLabelCmd())
 	cmd.AddCommand(newAgentCmd())
+	cmd.AddCommand(newMCPCmd())
 	return cmd
 }
