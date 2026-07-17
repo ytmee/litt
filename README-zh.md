@@ -50,8 +50,6 @@ litt issue block 2 1
 | `litt init` | 初始化 litt 仓库 |
 | `litt issue create <title>` | 创建 issue（`--kind`, `--body`, `--label`） |
 | `litt issue list` | 列出 issue（`--state`, `--kind`, `--label`, `--json`） |
-| `litt feature create <title>` | `issue create --kind feature` 的快捷别名 |
-| `litt feature list` | `issue list --kind feature` 的快捷别名 |
 | `litt issue show <n>` | 查看 issue 详情 |
 | `litt issue update <n>` | 更新 issue（`--title`, `--body`, `--state`, `--add-label`, `--remove-label`） |
 | `litt issue close <n>` | 关闭 issue |

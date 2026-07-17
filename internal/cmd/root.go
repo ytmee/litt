@@ -12,7 +12,6 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().String("db", "", "Path to litt database (auto-detected by default)")
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newIssueCmd())
-	cmd.AddCommand(newFeatureCmd())
 	cmd.AddCommand(newLabelCmd())
 	cmd.AddCommand(newAgentCmd())
 	cmd.AddCommand(newMCPCmd())

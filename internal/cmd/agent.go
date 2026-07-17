@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 )
+
+//go:embed agent-instructions.md
+var agentInstructionsContent string
 
 const managedBlockStart = "<!-- litt-agent-instructions-start -->\n"
 const managedBlockEnd = "\n<!-- litt-agent-instructions-end -->"
@@ -26,19 +30,7 @@ func managedBlock() string {
 }
 
 func managedContent() string {
-	var b strings.Builder
-	b.WriteString("# Managed by litt\n\n")
-	b.WriteString("This section is managed by litt. Do not edit manually.\n\n")
-	b.WriteString("## What is litt?\n\n")
-	b.WriteString("litt is a local-first task graph and execution tracker for AI agents. It stores\n")
-	b.WriteString("issues, labels, and blocking relationships in a local SQLite database.\n\n")
-	b.WriteString("## Commands\n\n")
-	b.WriteString("- `litt init` — Initialize a litt repository in the current directory.\n")
-	b.WriteString("- `litt label list` — List all labels.\n")
-	b.WriteString("- `litt label list --json` — List labels as JSON.\n")
-	b.WriteString("- `litt agent instructions` — Print this managed block.\n")
-	b.WriteString("- `litt agent install` — Install this managed block into AGENTS.md.\n")
-	return b.String()
+	return agentInstructionsContent
 }
 
 func newAgentInstructionsCmd() *cobra.Command {

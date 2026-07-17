@@ -188,7 +188,7 @@ func TestAgentInstructions_PrintsBlock(t *testing.T) {
 	if !strings.Contains(out, managedBlockStart) {
 		t.Fatal("output missing managed block start marker")
 	}
-	if !strings.Contains(out, "litt init") {
+	if !strings.Contains(out, "local issue tracker") {
 		t.Fatal("output missing expected content")
 	}
 }
@@ -256,7 +256,7 @@ func TestAgentInstall_ReplacesBlock(t *testing.T) {
 	if strings.Contains(string(data), "old content") {
 		t.Fatal("old content was not replaced")
 	}
-	if !strings.Contains(string(data), "managed by litt") {
+	if !strings.Contains(string(data), "local issue tracker") {
 		t.Fatal("block was not updated")
 	}
 }
@@ -1170,97 +1170,6 @@ func TestIssueReadyNoLabel(t *testing.T) {
 		t.Fatalf("expected no ready issues: %s", out)
 	}
 }
-
-func TestFeatureCreate(t *testing.T) {
-	dir := t.TempDir()
-	defer chdir(t, dir)()
-
-	if _, err := runCmd(t, "init"); err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runCmd(t, "feature", "create", "My feature", "--body", "details")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "Created issue #1") {
-		t.Fatalf("unexpected output: %s", out)
-	}
-	if !strings.Contains(out, "My feature") {
-		t.Fatalf("feature title missing: %s", out)
-	}
-}
-
-func TestFeatureCreateDefaultsToFeatureKind(t *testing.T) {
-	dir := t.TempDir()
-	defer chdir(t, dir)()
-
-	if _, err := runCmd(t, "init"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := runCmd(t, "feature", "create", "My feature"); err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runCmd(t, "issue", "show", "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "feature") {
-		t.Fatal("feature create should default to kind=feature")
-	}
-}
-
-func TestFeatureList(t *testing.T) {
-	dir := t.TempDir()
-	defer chdir(t, dir)()
-
-	if _, err := runCmd(t, "init"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runCmd(t, "feature", "create", "Feature 1"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runCmd(t, "issue", "create", "Task 1", "--kind", "task"); err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runCmd(t, "feature", "list")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "Feature 1") {
-		t.Fatalf("expected feature in output: %s", out)
-	}
-	if strings.Contains(out, "Task 1") {
-		t.Fatal("task should not appear in feature list")
-	}
-}
-
-func TestFeatureListJSON(t *testing.T) {
-	dir := t.TempDir()
-	defer chdir(t, dir)()
-
-	if _, err := runCmd(t, "init"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runCmd(t, "feature", "create", "Feature JSON"); err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runCmd(t, "feature", "list", "--json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(strings.TrimSpace(out), "[") {
-		t.Fatal("JSON output does not start with [")
-	}
-	if !strings.Contains(out, `"kind": "feature"`) {
-		t.Fatal("JSON output missing feature kind")
-	}
-}
-
 func TestInitWithDBFlag(t *testing.T) {
 	dir := t.TempDir()
 	defer chdir(t, dir)()

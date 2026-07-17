@@ -50,8 +50,6 @@ litt issue block 2 1
 | `litt init` | Initialize a litt repository |
 | `litt issue create <title>` | Create an issue (`--kind`, `--body`, `--label`) |
 | `litt issue list` | List issues (`--state`, `--kind`, `--label`, `--json`) |
-| `litt feature create <title>` | Convenience alias for `issue create --kind feature` |
-| `litt feature list` | Convenience alias for `issue list --kind feature` |
 | `litt issue show <n>` | Show issue detail |
 | `litt issue update <n>` | Update issue (`--title`, `--body`, `--state`, `--add-label`, `--remove-label`) |
 | `litt issue close <n>` | Close an issue |
