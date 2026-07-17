@@ -23,6 +23,13 @@ func newIssueCmd() *cobra.Command {
 	cmd.AddCommand(newIssueUpdateCmd())
 	cmd.AddCommand(newIssueCloseCmd())
 	cmd.AddCommand(newIssueReopenCmd())
+	cmd.AddCommand(newIssueParentCmd())
+	cmd.AddCommand(newIssueChildrenCmd())
+	cmd.AddCommand(newIssueBlockCmd())
+	cmd.AddCommand(newIssueUnblockCmd())
+	cmd.AddCommand(newIssueBlockedByCmd())
+	cmd.AddCommand(newIssueBlockingCmd())
+	cmd.AddCommand(newIssueReadyCmd())
 	return cmd
 }
 
@@ -310,4 +317,289 @@ func newIssueReopenCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newIssueParentCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "parent",
+		Short: "Manage issue parent relationships",
+	}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "set <issue> <parent>",
+		Short: "Set the parent of an issue",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+			parentID, err := parseIssueNumber(args[1])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			if err := s.SetParent(id, parentID); err != nil {
+				return fmt.Errorf("set parent: %w", err)
+			}
+			cmd.Printf("Set parent of #%d to #%d\n", id, parentID)
+			return nil
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "clear <issue>",
+		Short: "Clear the parent of an issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			if err := s.ClearParent(id); err != nil {
+				return fmt.Errorf("clear parent: %w", err)
+			}
+			cmd.Printf("Cleared parent of #%d\n", id)
+			return nil
+		},
+	})
+	return cmd
+}
+
+func newIssueChildrenCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "children <parent>",
+		Short: "List children of a parent issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			parentID, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			children, err := s.ListChildren(parentID)
+			if err != nil {
+				return fmt.Errorf("list children: %w", err)
+			}
+
+			if len(children) == 0 {
+				cmd.Printf("No children found for #%d.\n", parentID)
+				return nil
+			}
+
+			cmd.Println("#    State   Kind     Title")
+			for _, issue := range children {
+				labelNames := make([]string, len(issue.Labels))
+				for j, l := range issue.Labels {
+					labelNames[j] = l.Name
+				}
+				labelsStr := ""
+				if len(labelNames) > 0 {
+					labelsStr = " [" + strings.Join(labelNames, ", ") + "]"
+				}
+				cmd.Printf("#%-3d %-7s %-8s %s%s\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr)
+			}
+			return nil
+		},
+	}
+}
+
+func newIssueBlockCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "block <blocker> <blocked>",
+		Short: "Create a blocking relationship",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			blockerID, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+			blockedID, err := parseIssueNumber(args[1])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			if err := s.CreateBlock(blockerID, blockedID); err != nil {
+				return fmt.Errorf("block: %w", err)
+			}
+			cmd.Printf("#%d now blocks #%d\n", blockerID, blockedID)
+			return nil
+		},
+	}
+}
+
+func newIssueUnblockCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "unblock <blocker> <blocked>",
+		Short: "Remove a blocking relationship",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			blockerID, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+			blockedID, err := parseIssueNumber(args[1])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			if err := s.RemoveBlock(blockerID, blockedID); err != nil {
+				return fmt.Errorf("unblock: %w", err)
+			}
+			cmd.Printf("Removed block: #%d no longer blocks #%d\n", blockerID, blockedID)
+			return nil
+		},
+	}
+}
+
+func newIssueBlockedByCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "blocked-by <issue>",
+		Short: "List issues blocking the given issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			blockers, err := s.ListBlockedBy(id)
+			if err != nil {
+				return fmt.Errorf("list blocked-by: %w", err)
+			}
+
+			if len(blockers) == 0 {
+				cmd.Printf("#%d is not blocked by any issue.\n", id)
+				return nil
+			}
+
+			cmd.Printf("#%d is blocked by:\n", id)
+			for _, b := range blockers {
+				cmd.Printf("  #%d %s (%s)\n", b.ID, b.Title, b.State)
+			}
+			return nil
+		},
+	}
+}
+
+func newIssueBlockingCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "blocking <issue>",
+		Short: "List issues blocked by the given issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			blocked, err := s.ListBlocking(id)
+			if err != nil {
+				return fmt.Errorf("list blocking: %w", err)
+			}
+
+			if len(blocked) == 0 {
+				cmd.Printf("#%d is not blocking any issue.\n", id)
+				return nil
+			}
+
+			cmd.Printf("#%d blocks:\n", id)
+			for _, b := range blocked {
+				cmd.Printf("  #%d %s (%s)\n", b.ID, b.Title, b.State)
+			}
+			return nil
+		},
+	}
+}
+
+func newIssueReadyCmd() *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "ready",
+		Short: "List issues ready for an agent",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			issues, err := s.ListReadyIssues()
+			if err != nil {
+				return fmt.Errorf("list ready issues: %w", err)
+			}
+
+			if jsonOutput {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				if err := enc.Encode(issues); err != nil {
+					return fmt.Errorf("encode ready issues: %w", err)
+				}
+				return nil
+			}
+
+			if len(issues) == 0 {
+				cmd.Println("No ready issues found.")
+				return nil
+			}
+
+			cmd.Println("#    State   Kind     Title")
+			for _, issue := range issues {
+				labelNames := make([]string, len(issue.Labels))
+				for j, l := range issue.Labels {
+					labelNames[j] = l.Name
+				}
+				labelsStr := ""
+				if len(labelNames) > 0 {
+					labelsStr = " [" + strings.Join(labelNames, ", ") + "]"
+				}
+				cmd.Printf("#%-3d %-7s %-8s %s%s\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	return cmd
 }

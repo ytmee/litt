@@ -429,6 +429,266 @@ func (s *Store) UpdateIssueLabels(issueID int, addLabels, removeLabels []string)
 	return nil
 }
 
+func (s *Store) SetParent(id, parentID int) error {
+	if id == parentID {
+		return fmt.Errorf("issue cannot be its own parent")
+	}
+
+	if _, err := s.GetIssue(id); err != nil {
+		return err
+	}
+	if _, err := s.GetIssue(parentID); err != nil {
+		return err
+	}
+
+	visited := make(map[int]bool)
+	current := parentID
+	for current != 0 {
+		if current == id {
+			return fmt.Errorf("setting parent would create a cycle")
+		}
+		if visited[current] {
+			break
+		}
+		visited[current] = true
+
+		var next *int
+		err := s.db.QueryRow("SELECT parent_issue_id FROM issues WHERE id = ?", current).Scan(&next)
+		if err != nil {
+			return fmt.Errorf("check parent cycle: %w", err)
+		}
+		if next == nil {
+			break
+		}
+		current = *next
+	}
+
+	_, err := s.db.Exec("UPDATE issues SET parent_issue_id = ?, updated_at = datetime('now') WHERE id = ?", parentID, id)
+	if err != nil {
+		return fmt.Errorf("set parent: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ClearParent(id int) error {
+	if _, err := s.GetIssue(id); err != nil {
+		return err
+	}
+
+	_, err := s.db.Exec("UPDATE issues SET parent_issue_id = NULL, updated_at = datetime('now') WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("clear parent: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ListChildren(parentID int) ([]Issue, error) {
+	rows, err := s.db.Query(
+		`SELECT id, title, body, state, kind, parent_issue_id, created_at, updated_at, closed_at
+		 FROM issues WHERE parent_issue_id = ? ORDER BY id`, parentID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list children: %w", err)
+	}
+	defer rows.Close()
+	var issues []Issue
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+			return nil, fmt.Errorf("scan child: %w", err)
+		}
+		issues = append(issues, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for idx := range issues {
+		labels, err := s.getIssueLabels(issues[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+		issues[idx].Labels = labels
+	}
+	return issues, nil
+}
+
+func (s *Store) CreateBlock(blockerID, blockedID int) error {
+	if blockerID == blockedID {
+		return fmt.Errorf("issue cannot block itself")
+	}
+
+	if _, err := s.GetIssue(blockerID); err != nil {
+		return err
+	}
+	if _, err := s.GetIssue(blockedID); err != nil {
+		return err
+	}
+
+	visited := make(map[int]bool)
+	stack := []int{blockedID}
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		if current == blockerID {
+			return fmt.Errorf("blocking this issue would create a cycle")
+		}
+
+		if visited[current] {
+			continue
+		}
+		visited[current] = true
+
+		rows, err := s.db.Query("SELECT blocked_issue_id FROM issue_blocks WHERE blocker_issue_id = ?", current)
+		if err != nil {
+			return fmt.Errorf("check block cycle: %w", err)
+		}
+		for rows.Next() {
+			var next int
+			if err := rows.Scan(&next); err != nil {
+				rows.Close()
+				return fmt.Errorf("scan blocked issue: %w", err)
+			}
+			stack = append(stack, next)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("iterate block rows: %w", err)
+		}
+	}
+
+	_, err := s.db.Exec(
+		"INSERT OR IGNORE INTO issue_blocks (blocker_issue_id, blocked_issue_id) VALUES (?, ?)",
+		blockerID, blockedID,
+	)
+	if err != nil {
+		return fmt.Errorf("create block: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) RemoveBlock(blockerID, blockedID int) error {
+	result, err := s.db.Exec(
+		"DELETE FROM issue_blocks WHERE blocker_issue_id = ? AND blocked_issue_id = ?",
+		blockerID, blockedID,
+	)
+	if err != nil {
+		return fmt.Errorf("remove block: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("block edge not found")
+	}
+	return nil
+}
+
+func (s *Store) ListBlockedBy(issueID int) ([]Issue, error) {
+	rows, err := s.db.Query(
+		`SELECT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at
+		 FROM issues i
+		 JOIN issue_blocks ib ON i.id = ib.blocker_issue_id
+		 WHERE ib.blocked_issue_id = ?
+		 ORDER BY i.id`, issueID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list blocked by: %w", err)
+	}
+	defer rows.Close()
+	var issues []Issue
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+			return nil, fmt.Errorf("scan blocked by issue: %w", err)
+		}
+		issues = append(issues, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for idx := range issues {
+		labels, err := s.getIssueLabels(issues[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+		issues[idx].Labels = labels
+	}
+	return issues, nil
+}
+
+func (s *Store) ListBlocking(issueID int) ([]Issue, error) {
+	rows, err := s.db.Query(
+		`SELECT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at
+		 FROM issues i
+		 JOIN issue_blocks ib ON i.id = ib.blocked_issue_id
+		 WHERE ib.blocker_issue_id = ?
+		 ORDER BY i.id`, issueID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list blocking: %w", err)
+	}
+	defer rows.Close()
+	var issues []Issue
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+			return nil, fmt.Errorf("scan blocking issue: %w", err)
+		}
+		issues = append(issues, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for idx := range issues {
+		labels, err := s.getIssueLabels(issues[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+		issues[idx].Labels = labels
+	}
+	return issues, nil
+}
+
+func (s *Store) ListReadyIssues() ([]Issue, error) {
+	rows, err := s.db.Query(
+		`SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at
+		 FROM issues i
+		 JOIN issue_labels il ON i.id = il.issue_id
+		 JOIN labels l ON il.label_id = l.id
+		 WHERE i.state = 'open'
+		 AND l.name = 'ready-for-agent'
+		 AND i.id NOT IN (
+			 SELECT ib.blocked_issue_id
+			 FROM issue_blocks ib
+			 JOIN issues blocker ON ib.blocker_issue_id = blocker.id
+			 WHERE blocker.state = 'open'
+		 )
+		 ORDER BY i.id`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list ready issues: %w", err)
+	}
+	defer rows.Close()
+	var issues []Issue
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+			return nil, fmt.Errorf("scan ready issue: %w", err)
+		}
+		issues = append(issues, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for idx := range issues {
+		labels, err := s.getIssueLabels(issues[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+		issues[idx].Labels = labels
+	}
+	return issues, nil
+}
+
 func (s *Store) CloseIssue(id int) error {
 	state := "closed"
 	return s.UpdateIssue(id, UpdateIssueOptions{State: &state})

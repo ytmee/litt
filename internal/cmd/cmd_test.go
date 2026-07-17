@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -751,6 +752,422 @@ func TestIssueUpdateStateOpenClearsClosedAt(t *testing.T) {
 	}
 	if !strings.Contains(out, "open") {
 		t.Fatal("issue should be open")
+	}
+}
+
+func TestIssueParentSet(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Child"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Parent"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "parent", "set", "1", "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Set parent of #1 to #2") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+
+	showOut, err := runCmd(t, "issue", "show", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(showOut, "Parent:  #2") {
+		t.Fatalf("expected parent #2 in show output: %s", showOut)
+	}
+}
+
+func TestIssueParentSetSelf(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Issue"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "issue", "parent", "set", "1", "1")
+	if err == nil {
+		t.Fatal("expected error for setting self as parent")
+	}
+}
+
+func TestIssueParentSetCycle(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := runCmd(t, "issue", "create", fmt.Sprintf("Issue %d", i+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := runCmd(t, "issue", "parent", "set", "2", "3"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "parent", "set", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "issue", "parent", "set", "3", "1")
+	if err == nil {
+		t.Fatal("expected cycle error")
+	}
+}
+
+func TestIssueParentClear(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Child"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Parent"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runCmd(t, "issue", "parent", "set", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "parent", "clear", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Cleared parent of #1") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+
+	showOut, err := runCmd(t, "issue", "show", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(showOut, "#2") {
+		t.Fatal("parent should have been cleared")
+	}
+}
+
+func TestIssueChildren(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Parent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Child 1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Child 2"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runCmd(t, "issue", "parent", "set", "2", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "parent", "set", "3", "1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "children", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Child 1") {
+		t.Fatalf("output missing Child 1: %s", out)
+	}
+	if !strings.Contains(out, "Child 2") {
+		t.Fatalf("output missing Child 2: %s", out)
+	}
+}
+
+func TestIssueBlock(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocked"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "block", "1", "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "#1 now blocks #2") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIssueUnblock(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocked"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "block", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "unblock", "1", "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Removed block") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIssueBlockCycle(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := runCmd(t, "issue", "create", fmt.Sprintf("Issue %d", i+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := runCmd(t, "issue", "block", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "block", "2", "3"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "issue", "block", "3", "1")
+	if err == nil {
+		t.Fatal("expected cycle error")
+	}
+}
+
+func TestIssueBlockSelf(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Issue"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "issue", "block", "1", "1")
+	if err == nil {
+		t.Fatal("expected error for self-block")
+	}
+}
+
+func TestIssueBlockedBy(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocked"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "block", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "blocked-by", "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "#2 is blocked by") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !strings.Contains(out, "#1") {
+		t.Fatalf("expected blocker #1 in output: %s", out)
+	}
+}
+
+func TestIssueBlocking(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocked"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "block", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "blocking", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "#1 blocks") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !strings.Contains(out, "#2") {
+		t.Fatalf("expected blocked #2 in output: %s", out)
+	}
+}
+
+func TestIssueReady(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Ready issue", "--label", "ready-for-agent"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Ready issue") {
+		t.Fatalf("expected ready issue in output: %s", out)
+	}
+}
+
+func TestIssueReadyJSON(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Ready issue", "--label", "ready-for-agent"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "ready", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(out), "[") {
+		t.Fatal("JSON output does not start with [")
+	}
+	if !strings.Contains(out, `"title": "Ready issue"`) {
+		t.Fatal("JSON output missing title")
+	}
+}
+
+func TestIssueReadyBlockedByOpen(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocker", "--label", "ready-for-agent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocked", "--label", "ready-for-agent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "block", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "Blocked") {
+		t.Fatal("blocked issue should not appear in ready output")
+	}
+	if !strings.Contains(out, "Blocker") {
+		t.Fatal("blocker should appear in ready output")
+	}
+}
+
+func TestIssueReadyBlockedByClosed(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocker", "--label", "ready-for-agent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Blocked", "--label", "ready-for-agent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "block", "1", "2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "close", "1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Blocked") {
+		t.Fatal("issue blocked by closed issue should appear in ready output")
+	}
+}
+
+func TestIssueReadyNoLabel(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "No label issue"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "No ready issues found") {
+		t.Fatalf("expected no ready issues: %s", out)
 	}
 }
 

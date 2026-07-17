@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -633,6 +634,376 @@ func TestCloseIssueNotFound(t *testing.T) {
 	err := s.CloseIssue(999)
 	if err == nil {
 		t.Fatal("expected error for non-existent issue")
+	}
+}
+
+func TestSetParent(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Child", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.CreateIssue("Parent", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.SetParent(1, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	issue, err := s.GetIssue(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issue.ParentIssueID == nil || *issue.ParentIssueID != 2 {
+		t.Fatalf("expected parent_issue_id 2, got %v", issue.ParentIssueID)
+	}
+}
+
+func TestSetParentSelf(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Issue", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.SetParent(1, 1)
+	if err == nil {
+		t.Fatal("expected error for setting self as parent")
+	}
+}
+
+func TestSetParentCycle(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 3; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.SetParent(2, 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetParent(1, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	err := s.SetParent(3, 1)
+	if err == nil {
+		t.Fatal("expected cycle error")
+	}
+}
+
+func TestClearParent(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Child", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.CreateIssue("Parent", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.SetParent(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ClearParent(1); err != nil {
+		t.Fatal(err)
+	}
+
+	issue, err := s.GetIssue(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issue.ParentIssueID != nil {
+		t.Fatalf("expected nil parent_issue_id, got %v", *issue.ParentIssueID)
+	}
+}
+
+func TestListChildren(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Parent", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Child %d", i+1), "task", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, id := range []int{2, 3, 4} {
+		if err := s.SetParent(id, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	children, err := s.ListChildren(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(children) != 3 {
+		t.Fatalf("expected 3 children, got %d", len(children))
+	}
+}
+
+func TestCreateBlock(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Blocker", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.CreateIssue("Blocked", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateBlockSelf(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Issue", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.CreateBlock(1, 1)
+	if err == nil {
+		t.Fatal("expected error for issue blocking itself")
+	}
+}
+
+func TestCreateBlockCycle(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 3; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateBlock(2, 3); err != nil {
+		t.Fatal(err)
+	}
+
+	err := s.CreateBlock(3, 1)
+	if err == nil {
+		t.Fatal("expected cycle error")
+	}
+}
+
+func TestRemoveBlock(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Blocker", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.CreateIssue("Blocked", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListBlockedBy(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 3; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.CreateBlock(1, 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateBlock(2, 3); err != nil {
+		t.Fatal(err)
+	}
+
+	blockers, err := s.ListBlockedBy(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blockers) != 2 {
+		t.Fatalf("expected 2 blockers, got %d", len(blockers))
+	}
+}
+
+func TestListBlocking(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 3; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateBlock(1, 3); err != nil {
+		t.Fatal(err)
+	}
+
+	blocked, err := s.ListBlocking(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocked) != 2 {
+		t.Fatalf("expected 2 blocked issues, got %d", len(blocked))
+	}
+}
+
+func TestListReadyIssues(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Ready issue", "task", "", []string{"ready-for-agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	issues, err := s.ListReadyIssues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 ready issue, got %d", len(issues))
+	}
+}
+
+func TestListReadyIssuesNotLabeled(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("No label", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	issues, err := s.ListReadyIssues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 0 {
+		t.Fatalf("expected 0 ready issues, got %d", len(issues))
+	}
+}
+
+func TestListReadyIssuesClosed(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Closed issue", "task", "", []string{"ready-for-agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CloseIssue(1); err != nil {
+		t.Fatal(err)
+	}
+
+	issues, err := s.ListReadyIssues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 0 {
+		t.Fatalf("expected 0 ready issues, got %d", len(issues))
+	}
+}
+
+func TestListReadyIssuesBlockedByOpen(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 2; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", []string{"ready-for-agent"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	issues, err := s.ListReadyIssues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 ready issue (unblocked one), got %d", len(issues))
+	}
+	if issues[0].ID != 1 {
+		t.Fatalf("expected issue 1 to be ready (the blocker), got issue %d", issues[0].ID)
+	}
+}
+
+func TestListReadyIssuesBlockedByClosed(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 2; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", []string{"ready-for-agent"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CloseIssue(1); err != nil {
+		t.Fatal(err)
+	}
+
+	issues, err := s.ListReadyIssues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 ready issue (blocked by closed), got %d", len(issues))
+	}
+	if issues[0].ID != 2 {
+		t.Fatalf("expected issue 2 to be ready, got issue %d", issues[0].ID)
 	}
 }
 
