@@ -298,7 +298,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 			issues = filtered
 		}
 
-		if input.IsBlocked != nil && *input.IsBlocked {
+		if input.IsBlocked != nil {
 			var filtered []store.Issue
 			for _, issue := range issues {
 				blockers, listErr := s.ListBlockedBy(issue.ID)
@@ -312,7 +312,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 						break
 					}
 				}
-				if hasOpenBlocker {
+				if *input.IsBlocked == hasOpenBlocker {
 					filtered = append(filtered, issue)
 				}
 			}
