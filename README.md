@@ -2,6 +2,8 @@
 
 [中文](./README-zh.md)
 
+[![CI](https://github.com/ytmee/litt/actions/workflows/ci.yml/badge.svg)](https://github.com/ytmee/litt/actions/workflows/ci.yml) [![Go Version](https://img.shields.io/badge/Go-1.26-blue?logo=go)](https://go.dev) [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
+
 A local-first task graph and execution tracker for AI agents.
 
 ## Features
@@ -18,12 +20,24 @@ A local-first task graph and execution tracker for AI agents.
 ## Installation
 
 ```bash
+# Option 1: install via go
+go install github.com/ytmee/litt@latest
+
+# Option 2: build from source
 git clone https://github.com/ytmee/litt.git
 cd litt
-go build -o litt .
+go build -ldflags="-s -w" -o litt .
+sudo mv litt /usr/local/bin/
 ```
 
-Or download a binary from the [releases page](https://github.com/ytmee/litt/releases).
+Or download a pre-built binary from the [releases page](https://github.com/ytmee/litt/releases):
+
+```bash
+# Example: Linux amd64
+curl -LO https://github.com/ytmee/litt/releases/latest/download/litt_linux_amd64
+sudo mv litt_linux_amd64 /usr/local/bin/litt
+sudo chmod +x /usr/local/bin/litt
+```
 
 ## Quick start
 

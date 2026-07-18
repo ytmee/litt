@@ -2,6 +2,8 @@
 
 [English](./README.md)
 
+[![CI](https://github.com/ytmee/litt/actions/workflows/ci.yml/badge.svg)](https://github.com/ytmee/litt/actions/workflows/ci.yml) [![Go Version](https://img.shields.io/badge/Go-1.26-blue?logo=go)](https://go.dev) [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
+
 AI agent 的本地优先任务图与执行追踪器。
 
 ## 功能
@@ -18,12 +20,24 @@ AI agent 的本地优先任务图与执行追踪器。
 ## 安装
 
 ```bash
+# 方式一：通过 go 安装
+go install github.com/ytmee/litt@latest
+
+# 方式二：从源码编译
 git clone https://github.com/ytmee/litt.git
 cd litt
-go build -o litt .
+go build -ldflags="-s -w" -o litt .
+sudo mv litt /usr/local/bin/
 ```
 
-或从 [releases 页面](https://github.com/ytmee/litt/releases) 下载二进制。
+或从 [releases 页面](https://github.com/ytmee/litt/releases) 下载预编译的二进制：
+
+```bash
+# 示例：Linux amd64
+curl -LO https://github.com/ytmee/litt/releases/latest/download/litt_linux_amd64
+sudo mv litt_linux_amd64 /usr/local/bin/litt
+sudo chmod +x /usr/local/bin/litt
+```
 
 ## 快速开始
 

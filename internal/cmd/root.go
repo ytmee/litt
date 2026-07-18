@@ -4,10 +4,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewRootCmd() *cobra.Command {
+func NewRootCmd(version string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "litt",
-		Short: "Local-first task graph and execution tracker for AI agents",
+		Use:     "litt",
+		Short:   "Local-first task graph and execution tracker for AI agents",
+		Version: version,
 	}
 	cmd.PersistentFlags().String("db", "", "Path to litt database (auto-detected by default)")
 	cmd.AddCommand(newInitCmd())

@@ -1,0 +1,51 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.5
+      - name: Install UPX
+        run: sudo apt-get update && sudo apt-get install -y upx-ucl
+      - name: Build artifacts
+        run: |
+          flags="-s -w -X main.version=${GITHUB_REF_NAME#v}"
+          targets=(
+            "linux amd64"
+            "linux arm64"
+            "linux 386"
+            "linux arm"
+            "darwin amd64"
+            "darwin arm64"
+            "windows amd64"
+          )
+          for target in "${targets[@]}"; do
+            read -r os arch <<< "$target"
+            ext=""
+            [ "$os" = "windows" ] && ext=".exe"
+            goarm=""
+            [ "$arch" = "arm" ] && goarm=6
+            target_name="litt_${os}_${arch}${ext}"
+            echo "Building $target_name"
+            GOOS=$os GOARCH=$arch GOARM=$goarm go build -ldflags="$flags" -o "dist/$target_name" .
+            if [ "$os" != "darwin" ]; then
+              upx --best --no-color "dist/$target_name"
+            fi
+          done
+          cd dist && sha256sum litt_* > checksums.txt
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true
