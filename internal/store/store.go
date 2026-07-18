@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/ytmee/litt/internal/graph"
 )
 
 //go:embed migrations/*.sql
@@ -431,32 +433,6 @@ func (s *Store) UpdateIssueLabels(issueID int, addLabels, removeLabels []string)
 	return nil
 }
 
-// hasPath performs DFS from start following neighbors, returning true
-// if target is reachable. Used for cycle detection.
-func hasPath(start, target int, neighbors func(int) ([]int, error)) (bool, error) {
-	visited := make(map[int]bool)
-	stack := []int{start}
-	for len(stack) > 0 {
-		current := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-
-		if current == target {
-			return true, nil
-		}
-		if visited[current] {
-			continue
-		}
-		visited[current] = true
-
-		ns, err := neighbors(current)
-		if err != nil {
-			return false, err
-		}
-		stack = append(stack, ns...)
-	}
-	return false, nil
-}
-
 func (s *Store) SetParent(id, parentID int) error {
 	if id == parentID {
 		return fmt.Errorf("issue cannot be its own parent")
@@ -473,7 +449,7 @@ func (s *Store) SetParent(id, parentID int) error {
 		return fmt.Errorf("parent issue must be open")
 	}
 
-	cycle, err := hasPath(parentID, id, func(node int) ([]int, error) {
+	cycle, err := graph.HasPath(parentID, id, func(node int) ([]int, error) {
 		var next *int
 		err := s.db.QueryRow("SELECT parent_issue_id FROM issues WHERE id = ?", node).Scan(&next)
 		if err != nil {
@@ -552,7 +528,7 @@ func (s *Store) CreateBlock(blockerID, blockedID int) (bool, error) {
 		return false, err
 	}
 
-	cycle, err := hasPath(blockedID, blockerID, func(node int) ([]int, error) {
+	cycle, err := graph.HasPath(blockedID, blockerID, func(node int) ([]int, error) {
 		rows, err := s.db.Query("SELECT blocked_issue_id FROM issue_blocks WHERE blocker_issue_id = ?", node)
 		if err != nil {
 			return nil, fmt.Errorf("check block cycle: %w", err)
