@@ -9,16 +9,15 @@ import (
 	"github.com/ytmee/litt/internal/store"
 )
 
-func initDBPath(cmd *cobra.Command) (string, string, error) {
+func initDBPath(cmd *cobra.Command) (string, error) {
 	if cmd.Flags().Changed("db") {
 		path, _ := cmd.Flags().GetString("db")
 		if path == "" {
-			return "", "", fmt.Errorf("--db flag requires a non-empty path")
+			return "", fmt.Errorf("--db flag requires a non-empty path")
 		}
-		return path, filepath.Dir(path), nil
+		return path, nil
 	}
-	littDir := filepath.Join(".litt")
-	return filepath.Join(littDir, "litt.db"), littDir, nil
+	return filepath.Join(".litt", "litt.db"), nil
 }
 
 func newInitCmd() *cobra.Command {
@@ -26,24 +25,15 @@ func newInitCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize a litt repository",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dbPath, littDir, err := initDBPath(cmd)
+			dbPath, err := initDBPath(cmd)
 			if err != nil {
 				return err
 			}
-			if err := os.MkdirAll(littDir, 0755); err != nil {
-				return fmt.Errorf("create %s: %w", littDir, err)
-			}
-			s, err := store.Open(dbPath)
+			s, err := store.Ensure(dbPath)
 			if err != nil {
-				return fmt.Errorf("open store: %w", err)
+				return fmt.Errorf("initialize store: %w", err)
 			}
 			defer s.Close()
-			if err := s.Migrate(); err != nil {
-				return fmt.Errorf("migrate: %w", err)
-			}
-			if err := s.SeedLabels(); err != nil {
-				return fmt.Errorf("seed labels: %w", err)
-			}
 			if !cmd.Flags().Changed("db") {
 				if err := appendGitignore(); err != nil {
 					return fmt.Errorf("update .gitignore: %w", err)

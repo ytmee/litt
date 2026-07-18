@@ -3,73 +3,51 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
+	"github.com/ytmee/litt/internal/query"
 	"github.com/ytmee/litt/internal/store"
 )
 
 type mcpServer struct {
-	store  *store.Store
+	s      *store.Store
 	dbPath string
 	mu     sync.Mutex
 }
 
-func (ms *mcpServer) getStore() *store.Store {
+func (ms *mcpServer) storeForRead() *store.Store {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	if ms.store != nil {
-		return ms.store
+	if ms.s != nil {
+		return ms.s
 	}
-	if ms.dbPath == "" {
-		return nil
-	}
-	if _, err := os.Stat(ms.dbPath); os.IsNotExist(err) {
-		return nil
-	}
-	s, err := store.Open(ms.dbPath)
+	s, err := store.OpenIfExists(ms.dbPath)
 	if err != nil {
 		return nil
 	}
-	ms.store = s
-	return ms.store
+	if s != nil {
+		ms.s = s
+	}
+	return s
 }
 
-func (ms *mcpServer) getOrInitStore() (*store.Store, error) {
+func (ms *mcpServer) storeForWrite() (*store.Store, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	if ms.store != nil {
-		return ms.store, nil
+	if ms.s != nil {
+		return ms.s, nil
 	}
 	if ms.dbPath == "" {
 		return nil, fmt.Errorf("no database path configured")
 	}
-	needInit := false
-	if _, err := os.Stat(ms.dbPath); os.IsNotExist(err) {
-		needInit = true
-		if err := os.MkdirAll(filepath.Dir(ms.dbPath), 0755); err != nil {
-			return nil, fmt.Errorf("create db directory: %w", err)
-		}
-	}
-	s, err := store.Open(ms.dbPath)
+	s, err := store.Ensure(ms.dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
+		return nil, err
 	}
-	if needInit {
-		if err := s.Migrate(); err != nil {
-			s.Close()
-			return nil, fmt.Errorf("migrate: %w", err)
-		}
-		if err := s.SeedLabels(); err != nil {
-			s.Close()
-			return nil, fmt.Errorf("seed labels: %w", err)
-		}
-	}
-	ms.store = s
-	return ms.store, nil
+	ms.s = s
+	return ms.s, nil
 }
 
 func newMCPCmd() *cobra.Command {
@@ -88,8 +66,8 @@ func newMCPCmd() *cobra.Command {
 	return cmd
 }
 
-func newMCPServer(s *store.Store) *mcp.Server {
-	return buildMCPServer(&mcpServer{store: s})
+func newMCPServer(st *store.Store) *mcp.Server {
+	return buildMCPServer(&mcpServer{s: st})
 }
 
 func newMCPServerLazy(dbPath string) *mcp.Server {
@@ -119,7 +97,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if input.Labels == nil {
 			input.Labels = []string{}
 		}
-		s, err := ms.getOrInitStore()
+		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -143,7 +121,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "update_issue",
 		Description: "Update an existing litt issue. Kind can be 'spec', 'task', or 'bug' if provided.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input updateIssueInput) (*mcp.CallToolResult, any, error) {
-		s, err := ms.getOrInitStore()
+		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -181,6 +159,19 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "query_issues",
 		Description: "Query litt issues with optional filters",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input queryIssuesInput) (*mcp.CallToolResult, any, error) {
+		var blocksIssue, blockedByIssue int
+		if input.BlocksIssue != nil {
+			blocksIssue = *input.BlocksIssue
+		}
+		if input.BlockedByIssue != nil {
+			blockedByIssue = *input.BlockedByIssue
+		}
+
+		s := ms.storeForRead()
+		if s == nil {
+			return nil, map[string]any{"issues": []store.Issue{}}, nil
+		}
+
 		state := ""
 		kind := ""
 		label := ""
@@ -194,84 +185,17 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 			label = *input.Label
 		}
 
-		if input.BlocksIssue != nil && input.BlockedByIssue != nil {
-			return nil, nil, fmt.Errorf("blocks_issue and blocked_by_issue are mutually exclusive")
+		issues, err := query.ListIssues(s, query.Params{
+			State:          state,
+			Kind:           kind,
+			Label:          label,
+			IsBlocked:      input.IsBlocked,
+			BlocksIssue:    blocksIssue,
+			BlockedByIssue: blockedByIssue,
+		})
+		if err != nil {
+			return nil, nil, err
 		}
-
-		s := ms.getStore()
-		if s == nil {
-			return nil, map[string]any{"issues": []store.Issue{}}, nil
-		}
-
-		var issues []store.Issue
-		var err error
-
-		if input.BlocksIssue != nil {
-			blockers, listErr := s.ListBlockedBy(*input.BlocksIssue)
-			if listErr != nil {
-				return nil, nil, listErr
-			}
-			issues = blockers
-		} else if input.BlockedByIssue != nil {
-			blocked, listErr := s.ListBlocking(*input.BlockedByIssue)
-			if listErr != nil {
-				return nil, nil, listErr
-			}
-			issues = blocked
-		} else {
-			issues, err = s.ListIssues(state, kind, label)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-
-		if input.BlocksIssue != nil || input.BlockedByIssue != nil {
-			var filtered []store.Issue
-			for _, issue := range issues {
-				if state != "" && issue.State != state {
-					continue
-				}
-				if kind != "" && issue.Kind != kind {
-					continue
-				}
-				if label != "" {
-					hasLabel := false
-					for _, l := range issue.Labels {
-						if l.Name == label {
-							hasLabel = true
-							break
-						}
-					}
-					if !hasLabel {
-						continue
-					}
-				}
-				filtered = append(filtered, issue)
-			}
-			issues = filtered
-		}
-
-		if input.IsBlocked != nil {
-			var filtered []store.Issue
-			for _, issue := range issues {
-				blockers, listErr := s.ListBlockedBy(issue.ID)
-				if listErr != nil {
-					return nil, nil, listErr
-				}
-				hasOpenBlocker := false
-				for _, b := range blockers {
-					if b.State == "open" {
-						hasOpenBlocker = true
-						break
-					}
-				}
-				if *input.IsBlocked == hasOpenBlocker {
-					filtered = append(filtered, issue)
-				}
-			}
-			issues = filtered
-		}
-
 		return nil, map[string]any{"issues": issues}, nil
 	})
 
@@ -282,7 +206,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "get_issue",
 		Description: "Get a single litt issue by number",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input getIssueInput) (*mcp.CallToolResult, any, error) {
-		s := ms.getStore()
+		s := ms.storeForRead()
 		if s == nil {
 			return nil, nil, fmt.Errorf("issue %d not found", input.Number)
 		}
@@ -297,11 +221,11 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "get_ready_issues",
 		Description: "Get litt issues ready for an agent (open, labeled ready-for-agent, not blocked by open issues)",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, any, error) {
-		s := ms.getStore()
+		s := ms.storeForRead()
 		if s == nil {
 			return nil, map[string]any{"issues": []store.Issue{}}, nil
 		}
-		issues, err := s.ListReadyIssues()
+		issues, err := query.ListReady(s)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -316,7 +240,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "set_parent",
 		Description: "Set the parent of a litt issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input setParentInput) (*mcp.CallToolResult, any, error) {
-		s, err := ms.getOrInitStore()
+		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -337,7 +261,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "clear_parent",
 		Description: "Clear the parent of a litt issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input clearParentInput) (*mcp.CallToolResult, any, error) {
-		s, err := ms.getOrInitStore()
+		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -359,7 +283,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "add_blocking",
 		Description: "Create a blocking relationship between litt issues",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input addBlockingInput) (*mcp.CallToolResult, any, error) {
-		s, err := ms.getOrInitStore()
+		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -383,7 +307,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "remove_blocking",
 		Description: "Remove a blocking relationship between litt issues",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input removeBlockingInput) (*mcp.CallToolResult, any, error) {
-		s, err := ms.getOrInitStore()
+		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
 		}

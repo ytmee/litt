@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/ytmee/litt/internal/query"
 	"github.com/ytmee/litt/internal/store"
 )
 
@@ -552,7 +553,7 @@ func newIssueReadyCmd() *cobra.Command {
 			}
 			defer s.Close()
 
-			issues, err := s.ListReadyIssues()
+			issues, err := query.ListReady(s)
 			if err != nil {
 				return fmt.Errorf("list ready issues: %w", err)
 			}

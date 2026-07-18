@@ -667,47 +667,6 @@ func (s *Store) ListBlocking(issueID int) ([]Issue, error) {
 	return issues, nil
 }
 
-func (s *Store) ListReadyIssues() ([]Issue, error) {
-	rows, err := s.db.Query(
-		`SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at
-		 FROM issues i
-		 JOIN issue_labels il ON i.id = il.issue_id
-		 JOIN labels l ON il.label_id = l.id
-		 WHERE i.state = 'open'
-		 AND l.name = 'ready-for-agent'
-		 AND i.id NOT IN (
-			 SELECT ib.blocked_issue_id
-			 FROM issue_blocks ib
-			 JOIN issues blocker ON ib.blocker_issue_id = blocker.id
-			 WHERE blocker.state = 'open'
-		 )
-		 ORDER BY i.id`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list ready issues: %w", err)
-	}
-	defer rows.Close()
-	var issues []Issue
-	for rows.Next() {
-		var i Issue
-		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
-			return nil, fmt.Errorf("scan ready issue: %w", err)
-		}
-		issues = append(issues, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for idx := range issues {
-		labels, err := s.getIssueLabels(issues[idx].ID)
-		if err != nil {
-			return nil, err
-		}
-		issues[idx].Labels = labels
-	}
-	return issues, nil
-}
-
 func (s *Store) CloseIssue(id int) error {
 	state := "closed"
 	return s.UpdateIssue(id, UpdateIssueOptions{State: &state})
