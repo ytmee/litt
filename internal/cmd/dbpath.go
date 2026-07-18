@@ -53,35 +53,3 @@ func openStore(cmd *cobra.Command) (*store.Store, error) {
 	return s, nil
 }
 
-func openOrInitStore(cmd *cobra.Command) (*store.Store, error) {
-	dbPath, err := resolveDBPath(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		littDir := filepath.Dir(dbPath)
-		if err := os.MkdirAll(littDir, 0755); err != nil {
-			return nil, fmt.Errorf("create %s: %w", littDir, err)
-		}
-		s, err := store.Open(dbPath)
-		if err != nil {
-			return nil, fmt.Errorf("open store: %w", err)
-		}
-		if err := s.Migrate(); err != nil {
-			s.Close()
-			return nil, fmt.Errorf("migrate: %w", err)
-		}
-		if err := s.SeedLabels(); err != nil {
-			s.Close()
-			return nil, fmt.Errorf("seed labels: %w", err)
-		}
-		return s, nil
-	}
-
-	s, err := store.Open(dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
-	}
-	return s, nil
-}
