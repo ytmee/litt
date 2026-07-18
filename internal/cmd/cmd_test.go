@@ -286,7 +286,7 @@ func TestIssueCreateWithLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runCmd(t, "issue", "create", "Bug fix", "--kind", "task", "--label", "bug", "--label", "ready-for-agent")
+	out, err := runCmd(t, "issue", "create", "Bug fix", "--kind", "task", "--label", "enhancement", "--label", "ready-for-agent")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestIssueCreateWithLabels(t *testing.T) {
 	}
 }
 
-func TestIssueCreateImplicitLabel(t *testing.T) {
+func TestIssueCreateUnknownLabel(t *testing.T) {
 	dir := t.TempDir()
 	defer chdir(t, dir)()
 
@@ -303,12 +303,9 @@ func TestIssueCreateImplicitLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runCmd(t, "issue", "create", "Custom", "--label", "my-custom-label")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "Created issue #1") {
-		t.Fatalf("unexpected output: %s", out)
+	_, err := runCmd(t, "issue", "create", "Custom", "--label", "my-custom-label")
+	if err == nil {
+		t.Fatal("expected error for unknown label")
 	}
 }
 
@@ -417,14 +414,14 @@ func TestIssueListFilterLabel(t *testing.T) {
 	if _, err := runCmd(t, "init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runCmd(t, "issue", "create", "Buggy", "--label", "bug"); err != nil {
+	if _, err := runCmd(t, "issue", "create", "Buggy", "--label", "needs-triage"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runCmd(t, "issue", "create", "Nice", "--label", "enhancement"); err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := runCmd(t, "issue", "list", "--label", "bug")
+	out, err := runCmd(t, "issue", "list", "--label", "needs-triage")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +440,7 @@ func TestIssueListJSON(t *testing.T) {
 	if _, err := runCmd(t, "init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runCmd(t, "issue", "create", "Test issue", "--label", "bug"); err != nil {
+	if _, err := runCmd(t, "issue", "create", "Test issue", "--label", "enhancement"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -457,7 +454,7 @@ func TestIssueListJSON(t *testing.T) {
 	if !strings.Contains(out, `"title": "Test issue"`) {
 		t.Fatal("JSON output missing title")
 	}
-	if !strings.Contains(out, `"name": "bug"`) {
+	if !strings.Contains(out, `"name": "enhancement"`) {
 		t.Fatal("JSON output missing label")
 	}
 }
@@ -469,7 +466,7 @@ func TestIssueShow(t *testing.T) {
 	if _, err := runCmd(t, "init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runCmd(t, "issue", "create", "Test issue", "--body", "details", "--label", "bug"); err != nil {
+	if _, err := runCmd(t, "issue", "create", "Test issue", "--body", "details", "--label", "enhancement"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -486,7 +483,7 @@ func TestIssueShow(t *testing.T) {
 	if !strings.Contains(out, "#1") {
 		t.Fatal("show output missing issue ID")
 	}
-	if !strings.Contains(out, "bug") {
+	if !strings.Contains(out, "enhancement") {
 		t.Fatal("show output missing label")
 	}
 }
@@ -570,7 +567,7 @@ func TestIssueUpdateAddLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := runCmd(t, "issue", "update", "1", "--add-label", "bug", "--add-label", "enhancement")
+	_, err := runCmd(t, "issue", "update", "1", "--add-label", "needs-triage", "--add-label", "enhancement")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -579,8 +576,8 @@ func TestIssueUpdateAddLabel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "bug") {
-		t.Fatal("bug label not added")
+	if !strings.Contains(out, "needs-triage") {
+		t.Fatal("needs-triage label not added")
 	}
 	if !strings.Contains(out, "enhancement") {
 		t.Fatal("enhancement label not added")
@@ -594,11 +591,11 @@ func TestIssueUpdateRemoveLabel(t *testing.T) {
 	if _, err := runCmd(t, "init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runCmd(t, "issue", "create", "Test", "--label", "bug", "--label", "enhancement"); err != nil {
+	if _, err := runCmd(t, "issue", "create", "Test", "--label", "needs-triage", "--label", "enhancement"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := runCmd(t, "issue", "update", "1", "--remove-label", "bug")
+	_, err := runCmd(t, "issue", "update", "1", "--remove-label", "needs-triage")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,8 +604,8 @@ func TestIssueUpdateRemoveLabel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "bug") {
-		t.Fatal("bug label should have been removed")
+	if strings.Contains(out, "needs-triage") {
+		t.Fatal("needs-triage label should have been removed")
 	}
 	if !strings.Contains(out, "enhancement") {
 		t.Fatal("enhancement label should still be present")
@@ -643,7 +640,7 @@ func TestIssueUpdateTriageMutualExclusion(t *testing.T) {
 	}
 }
 
-func TestIssueUpdateImplicitLabelCreation(t *testing.T) {
+func TestIssueUpdateUnknownLabel(t *testing.T) {
 	dir := t.TempDir()
 	defer chdir(t, dir)()
 
@@ -655,16 +652,8 @@ func TestIssueUpdateImplicitLabelCreation(t *testing.T) {
 	}
 
 	_, err := runCmd(t, "issue", "update", "1", "--add-label", "new-custom-label")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runCmd(t, "issue", "show", "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "new-custom-label") {
-		t.Fatal("custom label should have been created and attached")
+	if err == nil {
+		t.Fatal("expected error for unknown label")
 	}
 }
 

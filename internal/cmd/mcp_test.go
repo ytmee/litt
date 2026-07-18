@@ -132,7 +132,7 @@ func TestMCPCreateIssue(t *testing.T) {
 		"kind":   "task",
 		"title":  "Test issue",
 		"body":   "details",
-		"labels": []string{"bug"},
+		"labels": []string{"enhancement"},
 	})
 	if !strings.Contains(text, `"number":1`) && !strings.Contains(text, `"number": 1`) {
 		t.Fatalf("expected number 1 in response, got: %s", text)
@@ -173,7 +173,7 @@ func TestMCPGetIssue(t *testing.T) {
 	s, session, cleanup := mcpTestSetup(t)
 	defer cleanup()
 
-	_, err := s.CreateIssue("Test", "task", "body", []string{"bug"})
+	_, err := s.CreateIssue("Test", "task", "body", []string{"enhancement"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,8 +187,8 @@ func TestMCPGetIssue(t *testing.T) {
 	if !strings.Contains(text, "body") {
 		t.Fatalf("expected body in response, got: %s", text)
 	}
-	if !strings.Contains(text, "bug") {
-		t.Fatalf("expected label 'bug' in response, got: %s", text)
+	if !strings.Contains(text, "enhancement") {
+		t.Fatalf("expected label 'enhancement' in response, got: %s", text)
 	}
 }
 
@@ -233,9 +233,9 @@ func TestMCPUpdateIssueAddLabels(t *testing.T) {
 
 	text := mcpToolSuccess(t, session, "update_issue", map[string]any{
 		"number":     1,
-		"add_labels": []string{"bug", "enhancement"},
+		"add_labels": []string{"enhancement"},
 	})
-	if !strings.Contains(text, "bug") || !strings.Contains(text, "enhancement") {
+	if !strings.Contains(text, "enhancement") {
 		t.Fatalf("expected labels in response, got: %s", text)
 	}
 }
@@ -319,7 +319,7 @@ func TestMCPQueryIssuesFilterLabel(t *testing.T) {
 	s, session, cleanup := mcpTestSetup(t)
 	defer cleanup()
 
-	_, err := s.CreateIssue("Bug", "task", "", []string{"bug"})
+	_, err := s.CreateIssue("Needs triage", "task", "", []string{"needs-triage"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,10 +329,10 @@ func TestMCPQueryIssuesFilterLabel(t *testing.T) {
 	}
 
 	text := mcpToolSuccess(t, session, "query_issues", map[string]any{
-		"label": "bug",
+		"label": "needs-triage",
 	})
-	if !strings.Contains(text, "Bug") {
-		t.Fatalf("expected 'Bug' in response, got: %s", text)
+	if !strings.Contains(text, "Needs triage") {
+		t.Fatalf("expected 'Needs triage' in response, got: %s", text)
 	}
 	if strings.Contains(text, "Feature") {
 		t.Fatal("should not contain 'Feature'")
@@ -375,7 +375,7 @@ func TestMCPQueryIssuesBlocksIssue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -399,7 +399,7 @@ func TestMCPQueryIssuesBlockedByIssue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -440,7 +440,7 @@ func TestMCPQueryIssuesIsBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -606,10 +606,10 @@ func TestMCPAddBlockingCycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(2, 3); err != nil {
+	if _, err := s.CreateBlock(2, 3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -634,7 +634,7 @@ func TestMCPRemoveBlocking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 

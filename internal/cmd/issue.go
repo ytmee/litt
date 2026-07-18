@@ -428,7 +428,7 @@ func newIssueBlockCmd() *cobra.Command {
 			}
 			defer s.Close()
 
-			if err := s.CreateBlock(blockerID, blockedID); err != nil {
+			if _, err := s.CreateBlock(blockerID, blockedID); err != nil {
 				return fmt.Errorf("block: %w", err)
 			}
 			cmd.Printf("#%d now blocks #%d\n", blockerID, blockedID)

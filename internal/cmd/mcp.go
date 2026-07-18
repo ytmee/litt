@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +26,17 @@ type mcpIssueResponse struct {
 	CreatedAt     string        `json:"created_at"`
 	UpdatedAt     string        `json:"updated_at"`
 	ClosedAt      *string       `json:"closed_at"`
+}
+
+func (r mcpIssueResponse) MarshalJSON() ([]byte, error) {
+	type alias mcpIssueResponse
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(alias(r)); err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
 func newMCPIssue(issue *store.Issue) mcpIssueResponse {
@@ -189,8 +202,12 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 			AddLabels:    input.AddLabels,
 			RemoveLabels: input.RemoveLabels,
 		}
-		if err := s.UpdateIssue(input.Number, opts); err != nil {
-			return nil, nil, err
+		hasFields := input.Title != nil || input.Body != nil || input.State != nil || input.Kind != nil ||
+			len(input.AddLabels) > 0 || len(input.RemoveLabels) > 0
+		if hasFields {
+			if err := s.UpdateIssue(input.Number, opts); err != nil {
+				return nil, nil, err
+			}
 		}
 		issue, err := s.GetIssue(input.Number)
 		if err != nil {
@@ -288,7 +305,14 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 				if listErr != nil {
 					return nil, nil, listErr
 				}
-				if len(blockers) > 0 {
+				hasOpenBlocker := false
+				for _, b := range blockers {
+					if b.State == "open" {
+						hasOpenBlocker = true
+						break
+					}
+				}
+				if hasOpenBlocker {
 					filtered = append(filtered, issue)
 				}
 			}
@@ -394,11 +418,13 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		if err := s.CreateBlock(input.BlockerNumber, input.BlockedNumber); err != nil {
+		created, err := s.CreateBlock(input.BlockerNumber, input.BlockedNumber)
+		if err != nil {
 			return nil, nil, err
 		}
 		return nil, map[string]interface{}{
 			"success":        true,
+			"created":        created,
 			"blocker_number": input.BlockerNumber,
 			"blocked_number": input.BlockedNumber,
 		}, nil

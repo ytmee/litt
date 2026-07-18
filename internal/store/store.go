@@ -236,9 +236,9 @@ func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (*Iss
 	intID := int(id)
 
 	for _, name := range labelNames {
-		label, err := s.GetOrCreateLabel(name)
+		label, err := s.FindLabel(name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("label %q does not exist", name)
 		}
 		if label.Kind == "triage" {
 			_, err = s.db.Exec(
@@ -404,9 +404,9 @@ func (s *Store) UpdateIssueLabels(issueID int, addLabels, removeLabels []string)
 	}
 
 	for _, name := range addLabels {
-		label, err := s.GetOrCreateLabel(name)
+		label, err := s.FindLabel(name)
 		if err != nil {
-			return err
+			return fmt.Errorf("label %q does not exist", name)
 		}
 		if label.Kind == "triage" {
 			_, err = s.db.Exec(
@@ -465,8 +465,12 @@ func (s *Store) SetParent(id, parentID int) error {
 	if _, err := s.GetIssue(id); err != nil {
 		return err
 	}
-	if _, err := s.GetIssue(parentID); err != nil {
+	parent, err := s.GetIssue(parentID)
+	if err != nil {
 		return err
+	}
+	if parent.State != "open" {
+		return fmt.Errorf("parent issue must be open")
 	}
 
 	cycle, err := hasPath(parentID, id, func(node int) ([]int, error) {
@@ -536,16 +540,16 @@ func (s *Store) ListChildren(parentID int) ([]Issue, error) {
 	return issues, nil
 }
 
-func (s *Store) CreateBlock(blockerID, blockedID int) error {
+func (s *Store) CreateBlock(blockerID, blockedID int) (bool, error) {
 	if blockerID == blockedID {
-		return fmt.Errorf("issue cannot block itself")
+		return false, fmt.Errorf("issue cannot block itself")
 	}
 
 	if _, err := s.GetIssue(blockerID); err != nil {
-		return err
+		return false, err
 	}
 	if _, err := s.GetIssue(blockedID); err != nil {
-		return err
+		return false, err
 	}
 
 	cycle, err := hasPath(blockedID, blockerID, func(node int) ([]int, error) {
@@ -565,20 +569,21 @@ func (s *Store) CreateBlock(blockerID, blockedID int) error {
 		return ids, rows.Err()
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if cycle {
-		return fmt.Errorf("blocking this issue would create a cycle")
+		return false, fmt.Errorf("blocking this issue would create a cycle")
 	}
 
-	_, err = s.db.Exec(
+	result, err := s.db.Exec(
 		"INSERT OR IGNORE INTO issue_blocks (blocker_issue_id, blocked_issue_id) VALUES (?, ?)",
 		blockerID, blockedID,
 	)
 	if err != nil {
-		return fmt.Errorf("create block: %w", err)
+		return false, fmt.Errorf("create block: %w", err)
 	}
-	return nil
+	n, _ := result.RowsAffected()
+	return n > 0, nil
 }
 
 func (s *Store) RemoveBlock(blockerID, blockedID int) error {

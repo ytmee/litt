@@ -214,34 +214,25 @@ func TestCreateIssueWithLabels(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	issue, err := s.CreateIssue("Feature", "spec", "", []string{"bug", "enhancement"})
+	issue, err := s.CreateIssue("Feature", "spec", "", []string{"enhancement"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if issue.ID != 1 {
 		t.Fatalf("expected id 1, got %d", issue.ID)
 	}
-	if len(issue.Labels) != 2 {
-		t.Fatalf("expected 2 labels, got %d", len(issue.Labels))
-	}
-}
-
-func TestCreateIssueImplicitLabelCreation(t *testing.T) {
-	s := setup(t)
-	defer s.Close()
-
-	issue, err := s.CreateIssue("Custom label test", "task", "", []string{"unknown-label"})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if len(issue.Labels) != 1 {
 		t.Fatalf("expected 1 label, got %d", len(issue.Labels))
 	}
-	if issue.Labels[0].Name != "unknown-label" {
-		t.Fatalf("expected label name %q, got %q", "unknown-label", issue.Labels[0].Name)
-	}
-	if issue.Labels[0].Kind != "custom" {
-		t.Fatalf("expected label kind %q, got %q", "custom", issue.Labels[0].Kind)
+}
+
+func TestCreateIssueUnknownLabel(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Bad label test", "task", "", []string{"unknown-label"})
+	if err == nil {
+		t.Fatal("expected error for unknown label")
 	}
 }
 
@@ -770,7 +761,7 @@ func TestCreateBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -784,7 +775,7 @@ func TestCreateBlockSelf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = s.CreateBlock(1, 1)
+	_, err = s.CreateBlock(1, 1)
 	if err == nil {
 		t.Fatal("expected error for issue blocking itself")
 	}
@@ -801,14 +792,14 @@ func TestCreateBlockCycle(t *testing.T) {
 		}
 	}
 
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(2, 3); err != nil {
+	if _, err := s.CreateBlock(2, 3); err != nil {
 		t.Fatal(err)
 	}
 
-	err := s.CreateBlock(3, 1)
+	_, err := s.CreateBlock(3, 1)
 	if err == nil {
 		t.Fatal("expected cycle error")
 	}
@@ -827,7 +818,7 @@ func TestRemoveBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.RemoveBlock(1, 2); err != nil {
@@ -846,10 +837,10 @@ func TestListBlockedBy(t *testing.T) {
 		}
 	}
 
-	if err := s.CreateBlock(1, 3); err != nil {
+	if _, err := s.CreateBlock(1, 3); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(2, 3); err != nil {
+	if _, err := s.CreateBlock(2, 3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -873,10 +864,10 @@ func TestListBlocking(t *testing.T) {
 		}
 	}
 
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateBlock(1, 3); err != nil {
+	if _, err := s.CreateBlock(1, 3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -957,7 +948,7 @@ func TestListReadyIssuesBlockedByOpen(t *testing.T) {
 		}
 	}
 
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -984,7 +975,7 @@ func TestListReadyIssuesBlockedByClosed(t *testing.T) {
 		}
 	}
 
-	if err := s.CreateBlock(1, 2); err != nil {
+	if _, err := s.CreateBlock(1, 2); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.CloseIssue(1); err != nil {
