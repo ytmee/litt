@@ -595,11 +595,11 @@ func TestUpdateIssueLabelsTriageMutualExclusion(t *testing.T) {
 	}
 }
 
-func TestResolveLabelCreatesCustom(t *testing.T) {
+func TestGetOrCreateLabelCreatesCustom(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	label, err := s.ResolveLabel("my-custom-label")
+	label, err := s.GetOrCreateLabel("my-custom-label")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -611,11 +611,11 @@ func TestResolveLabelCreatesCustom(t *testing.T) {
 	}
 }
 
-func TestResolveLabelExisting(t *testing.T) {
+func TestGetOrCreateLabelExisting(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	label, err := s.ResolveLabel("bug")
+	label, err := s.GetOrCreateLabel("bug")
 	if err != nil {
 		t.Fatal(err)
 	}

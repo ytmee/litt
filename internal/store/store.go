@@ -171,16 +171,21 @@ type UpdateIssueOptions struct {
 	RemoveLabels []string `json:"remove_labels,omitempty"`
 }
 
-func (s *Store) ResolveLabel(name string) (*Label, error) {
+func (s *Store) FindLabel(name string) (*Label, error) {
 	var l Label
 	err := s.db.QueryRow(
 		"SELECT id, name, color, description, kind FROM labels WHERE name = ?", name,
 	).Scan(&l.ID, &l.Name, &l.Color, &l.Description, &l.Kind)
-	if err == nil {
-		return &l, nil
+	if err != nil {
+		return nil, fmt.Errorf("find label %s: %w", name, err)
 	}
-	if err != sql.ErrNoRows {
-		return nil, fmt.Errorf("resolve label %s: %w", name, err)
+	return &l, nil
+}
+
+func (s *Store) GetOrCreateLabel(name string) (*Label, error) {
+	l, err := s.FindLabel(name)
+	if err == nil {
+		return l, nil
 	}
 
 	_, execErr := s.db.Exec(
@@ -190,13 +195,11 @@ func (s *Store) ResolveLabel(name string) (*Label, error) {
 		return nil, fmt.Errorf("create label %s: %w", name, execErr)
 	}
 
-	err = s.db.QueryRow(
-		"SELECT id, name, color, description, kind FROM labels WHERE name = ?", name,
-	).Scan(&l.ID, &l.Name, &l.Color, &l.Description, &l.Kind)
+	l, err = s.FindLabel(name)
 	if err != nil {
 		return nil, fmt.Errorf("re-query label %s: %w", name, err)
 	}
-	return &l, nil
+	return l, nil
 }
 
 func (s *Store) getIssueLabels(issueID int) ([]Label, error) {
@@ -234,7 +237,7 @@ func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (*Iss
 	intID := int(id)
 
 	for _, name := range labelNames {
-		label, err := s.ResolveLabel(name)
+		label, err := s.GetOrCreateLabel(name)
 		if err != nil {
 			return nil, err
 		}
@@ -402,7 +405,7 @@ func (s *Store) UpdateIssueLabels(issueID int, addLabels, removeLabels []string)
 	}
 
 	for _, name := range addLabels {
-		label, err := s.ResolveLabel(name)
+		label, err := s.GetOrCreateLabel(name)
 		if err != nil {
 			return err
 		}
@@ -429,6 +432,32 @@ func (s *Store) UpdateIssueLabels(issueID int, addLabels, removeLabels []string)
 	return nil
 }
 
+// hasPath performs DFS from start following neighbors, returning true
+// if target is reachable. Used for cycle detection.
+func hasPath(start, target int, neighbors func(int) ([]int, error)) (bool, error) {
+	visited := make(map[int]bool)
+	stack := []int{start}
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		if current == target {
+			return true, nil
+		}
+		if visited[current] {
+			continue
+		}
+		visited[current] = true
+
+		ns, err := neighbors(current)
+		if err != nil {
+			return false, err
+		}
+		stack = append(stack, ns...)
+	}
+	return false, nil
+}
+
 func (s *Store) SetParent(id, parentID int) error {
 	if id == parentID {
 		return fmt.Errorf("issue cannot be its own parent")
@@ -441,29 +470,25 @@ func (s *Store) SetParent(id, parentID int) error {
 		return err
 	}
 
-	visited := make(map[int]bool)
-	current := parentID
-	for current != 0 {
-		if current == id {
-			return fmt.Errorf("setting parent would create a cycle")
-		}
-		if visited[current] {
-			break
-		}
-		visited[current] = true
-
+	cycle, err := hasPath(parentID, id, func(node int) ([]int, error) {
 		var next *int
-		err := s.db.QueryRow("SELECT parent_issue_id FROM issues WHERE id = ?", current).Scan(&next)
+		err := s.db.QueryRow("SELECT parent_issue_id FROM issues WHERE id = ?", node).Scan(&next)
 		if err != nil {
-			return fmt.Errorf("check parent cycle: %w", err)
+			return nil, fmt.Errorf("check parent cycle: %w", err)
 		}
 		if next == nil {
-			break
+			return nil, nil
 		}
-		current = *next
+		return []int{*next}, nil
+	})
+	if err != nil {
+		return err
+	}
+	if cycle {
+		return fmt.Errorf("setting parent would create a cycle")
 	}
 
-	_, err := s.db.Exec("UPDATE issues SET parent_issue_id = ?, updated_at = datetime('now') WHERE id = ?", parentID, id)
+	_, err = s.db.Exec("UPDATE issues SET parent_issue_id = ?, updated_at = datetime('now') WHERE id = ?", parentID, id)
 	if err != nil {
 		return fmt.Errorf("set parent: %w", err)
 	}
@@ -524,40 +549,30 @@ func (s *Store) CreateBlock(blockerID, blockedID int) error {
 		return err
 	}
 
-	visited := make(map[int]bool)
-	stack := []int{blockedID}
-	for len(stack) > 0 {
-		current := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-
-		if current == blockerID {
-			return fmt.Errorf("blocking this issue would create a cycle")
-		}
-
-		if visited[current] {
-			continue
-		}
-		visited[current] = true
-
-		rows, err := s.db.Query("SELECT blocked_issue_id FROM issue_blocks WHERE blocker_issue_id = ?", current)
+	cycle, err := hasPath(blockedID, blockerID, func(node int) ([]int, error) {
+		rows, err := s.db.Query("SELECT blocked_issue_id FROM issue_blocks WHERE blocker_issue_id = ?", node)
 		if err != nil {
-			return fmt.Errorf("check block cycle: %w", err)
+			return nil, fmt.Errorf("check block cycle: %w", err)
 		}
+		defer rows.Close()
+		var ids []int
 		for rows.Next() {
-			var next int
-			if err := rows.Scan(&next); err != nil {
-				rows.Close()
-				return fmt.Errorf("scan blocked issue: %w", err)
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				return nil, fmt.Errorf("scan blocked issue: %w", err)
 			}
-			stack = append(stack, next)
+			ids = append(ids, id)
 		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("iterate block rows: %w", err)
-		}
+		return ids, rows.Err()
+	})
+	if err != nil {
+		return err
+	}
+	if cycle {
+		return fmt.Errorf("blocking this issue would create a cycle")
 	}
 
-	_, err := s.db.Exec(
+	_, err = s.db.Exec(
 		"INSERT OR IGNORE INTO issue_blocks (blocker_issue_id, blocked_issue_id) VALUES (?, ?)",
 		blockerID, blockedID,
 	)
