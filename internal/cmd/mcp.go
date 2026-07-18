@@ -3,6 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -39,18 +42,76 @@ func newMCPIssue(issue *store.Issue) mcpIssueResponse {
 	}
 }
 
+type mcpServer struct {
+	store  *store.Store
+	dbPath string
+	mu     sync.Mutex
+}
+
+func (ms *mcpServer) getStore() *store.Store {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	if ms.store != nil {
+		return ms.store
+	}
+	if ms.dbPath == "" {
+		return nil
+	}
+	if _, err := os.Stat(ms.dbPath); os.IsNotExist(err) {
+		return nil
+	}
+	s, err := store.Open(ms.dbPath)
+	if err != nil {
+		return nil
+	}
+	ms.store = s
+	return ms.store
+}
+
+func (ms *mcpServer) getOrInitStore() (*store.Store, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	if ms.store != nil {
+		return ms.store, nil
+	}
+	if ms.dbPath == "" {
+		return nil, fmt.Errorf("no database path configured")
+	}
+	needInit := false
+	if _, err := os.Stat(ms.dbPath); os.IsNotExist(err) {
+		needInit = true
+		if err := os.MkdirAll(filepath.Dir(ms.dbPath), 0755); err != nil {
+			return nil, fmt.Errorf("create db directory: %w", err)
+		}
+	}
+	s, err := store.Open(ms.dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	if needInit {
+		if err := s.Migrate(); err != nil {
+			s.Close()
+			return nil, fmt.Errorf("migrate: %w", err)
+		}
+		if err := s.SeedLabels(); err != nil {
+			s.Close()
+			return nil, fmt.Errorf("seed labels: %w", err)
+		}
+	}
+	ms.store = s
+	return ms.store, nil
+}
+
 func newMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Start an MCP stdio server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := openStore(cmd)
+			dbPath, err := resolveDBPath(cmd)
 			if err != nil {
 				return err
 			}
-			defer s.Close()
-
-			server := newMCPServer(s)
+			server := newMCPServerLazy(dbPath)
 			return server.Run(cmd.Context(), &mcp.StdioTransport{})
 		},
 	}
@@ -58,6 +119,14 @@ func newMCPCmd() *cobra.Command {
 }
 
 func newMCPServer(s *store.Store) *mcp.Server {
+	return buildMCPServer(&mcpServer{store: s})
+}
+
+func newMCPServerLazy(dbPath string) *mcp.Server {
+	return buildMCPServer(&mcpServer{dbPath: dbPath})
+}
+
+func buildMCPServer(ms *mcpServer) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "litt", Version: "0.1"}, nil)
 
 	type createIssueInput struct {
@@ -79,6 +148,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		if input.Labels == nil {
 			input.Labels = []string{}
 		}
+		s, err := ms.getOrInitStore()
+		if err != nil {
+			return nil, nil, err
+		}
 		issue, err := s.CreateIssue(input.Title, input.Kind, input.Body, input.Labels)
 		if err != nil {
 			return nil, nil, err
@@ -99,6 +172,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "update_issue",
 		Description: "Update an existing issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input updateIssueInput) (*mcp.CallToolResult, any, error) {
+		s, err := ms.getOrInitStore()
+		if err != nil {
+			return nil, nil, err
+		}
 		opts := store.UpdateIssueOptions{
 			Title:        input.Title,
 			Body:         input.Body,
@@ -144,6 +221,11 @@ func newMCPServer(s *store.Store) *mcp.Server {
 
 		if input.BlocksIssue != nil && input.BlockedByIssue != nil {
 			return nil, nil, fmt.Errorf("blocks_issue and blocked_by_issue are mutually exclusive")
+		}
+
+		s := ms.getStore()
+		if s == nil {
+			return nil, []mcpIssueResponse{}, nil
 		}
 
 		var issues []store.Issue
@@ -222,6 +304,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "get_issue",
 		Description: "Get a single issue by number",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input getIssueInput) (*mcp.CallToolResult, any, error) {
+		s := ms.getStore()
+		if s == nil {
+			return nil, nil, fmt.Errorf("issue %d not found", input.Number)
+		}
 		issue, err := s.GetIssue(input.Number)
 		if err != nil {
 			return nil, nil, err
@@ -233,6 +319,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "get_ready_issues",
 		Description: "Get issues ready for an agent (open, labeled ready-for-agent, not blocked by open issues)",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, any, error) {
+		s := ms.getStore()
+		if s == nil {
+			return nil, []mcpIssueResponse{}, nil
+		}
 		issues, err := s.ListReadyIssues()
 		if err != nil {
 			return nil, nil, err
@@ -252,6 +342,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "set_parent",
 		Description: "Set the parent of an issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input setParentInput) (*mcp.CallToolResult, any, error) {
+		s, err := ms.getOrInitStore()
+		if err != nil {
+			return nil, nil, err
+		}
 		if err := s.SetParent(input.IssueNumber, input.ParentNumber); err != nil {
 			return nil, nil, err
 		}
@@ -269,6 +363,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "clear_parent",
 		Description: "Clear the parent of an issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input clearParentInput) (*mcp.CallToolResult, any, error) {
+		s, err := ms.getOrInitStore()
+		if err != nil {
+			return nil, nil, err
+		}
 		if err := s.ClearParent(input.IssueNumber); err != nil {
 			return nil, nil, err
 		}
@@ -287,6 +385,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "add_blocking",
 		Description: "Create a blocking relationship between issues",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input addBlockingInput) (*mcp.CallToolResult, any, error) {
+		s, err := ms.getOrInitStore()
+		if err != nil {
+			return nil, nil, err
+		}
 		if err := s.CreateBlock(input.BlockerNumber, input.BlockedNumber); err != nil {
 			return nil, nil, err
 		}
@@ -305,6 +407,10 @@ func newMCPServer(s *store.Store) *mcp.Server {
 		Name:        "remove_blocking",
 		Description: "Remove a blocking relationship between issues",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input removeBlockingInput) (*mcp.CallToolResult, any, error) {
+		s, err := ms.getOrInitStore()
+		if err != nil {
+			return nil, nil, err
+		}
 		if err := s.RemoveBlock(input.BlockerNumber, input.BlockedNumber); err != nil {
 			return nil, nil, err
 		}

@@ -3,6 +3,13 @@
 litt stores features, tasks, labels, and blocking relationships in SQLite.
 Use its MCP tools instead of creating Markdown issue files.
 
+### Body format
+
+Write issue bodies in **Markdown**. Both humans (`litt issue show`) and agents
+(`get_issue`) read the raw body — Markdown keeps it readable in the terminal
+and structured enough for automated parsing. Use headings, lists, checkboxes,
+and code blocks to organise content.
+
 ### When to use each tool
 
 | When you need | Call this |
