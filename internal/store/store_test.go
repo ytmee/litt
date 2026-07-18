@@ -66,8 +66,8 @@ func TestSeedLabels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(labels) != 7 {
-		t.Fatalf("expected 7 seeded labels, got %d", len(labels))
+	if len(labels) != 6 {
+		t.Fatalf("expected 6 seeded labels, got %d", len(labels))
 	}
 }
 
@@ -92,8 +92,8 @@ func TestSeedLabelsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(labels) != 7 {
-		t.Fatalf("expected 7 labels after second seed, got %d", len(labels))
+	if len(labels) != 6 {
+		t.Fatalf("expected 6 labels after second seed, got %d", len(labels))
 	}
 }
 
@@ -122,7 +122,6 @@ func TestListLabels(t *testing.T) {
 		"ready-for-agent": "triage",
 		"ready-for-human": "triage",
 		"wontfix":         "triage",
-		"bug":             "category",
 		"enhancement":     "category",
 	}
 
@@ -215,7 +214,7 @@ func TestCreateIssueWithLabels(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	issue, err := s.CreateIssue("Feature", "feature", "", []string{"bug", "enhancement"})
+	issue, err := s.CreateIssue("Feature", "spec", "", []string{"bug", "enhancement"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +249,7 @@ func TestGetIssue(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	created, err := s.CreateIssue("Test", "task", "body", []string{"bug"})
+	created, err := s.CreateIssue("Test", "task", "body", []string{"enhancement"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,8 +264,8 @@ func TestGetIssue(t *testing.T) {
 	if len(issue.Labels) != 1 {
 		t.Fatalf("expected 1 label, got %d", len(issue.Labels))
 	}
-	if issue.Labels[0].Name != "bug" {
-		t.Fatalf("expected label %q, got %q", "bug", issue.Labels[0].Name)
+	if issue.Labels[0].Name != "enhancement" {
+		t.Fatalf("expected label %q, got %q", "enhancement", issue.Labels[0].Name)
 	}
 }
 
@@ -343,17 +342,17 @@ func TestListIssuesFilterKind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.CreateIssue("Feature", "feature", "", nil)
+	_, err = s.CreateIssue("Spec", "spec", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	features, err := s.ListIssues("", "feature", "")
+	specs, err := s.ListIssues("", "spec", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(features) != 1 {
-		t.Fatalf("expected 1 feature issue, got %d", len(features))
+	if len(specs) != 1 {
+		t.Fatalf("expected 1 spec issue, got %d", len(specs))
 	}
 }
 
@@ -361,21 +360,21 @@ func TestListIssuesFilterLabel(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	_, err := s.CreateIssue("Bug", "task", "", []string{"bug"})
+	_, err := s.CreateIssue("Bug", "bug", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.CreateIssue("Feature", "feature", "", []string{"enhancement"})
+	_, err = s.CreateIssue("Enhancement", "task", "", []string{"enhancement"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	bugIssues, err := s.ListIssues("", "", "bug")
+	bugIssues, err := s.ListIssues("", "bug", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(bugIssues) != 1 {
-		t.Fatalf("expected 1 issue with bug label, got %d", len(bugIssues))
+		t.Fatalf("expected 1 issue with kind bug, got %d", len(bugIssues))
 	}
 }
 
@@ -521,29 +520,7 @@ func TestUpdateIssueLabelsAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.UpdateIssueLabels(1, []string{"bug", "enhancement"}, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	issue, err := s.GetIssue(1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(issue.Labels) != 2 {
-		t.Fatalf("expected 2 labels, got %d", len(issue.Labels))
-	}
-}
-
-func TestUpdateIssueLabelsRemove(t *testing.T) {
-	s := setup(t)
-	defer s.Close()
-
-	_, err := s.CreateIssue("Test", "task", "", []string{"bug", "enhancement"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := s.UpdateIssueLabels(1, nil, []string{"bug"}); err != nil {
+	if err := s.UpdateIssueLabels(1, []string{"enhancement"}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -554,8 +531,27 @@ func TestUpdateIssueLabelsRemove(t *testing.T) {
 	if len(issue.Labels) != 1 {
 		t.Fatalf("expected 1 label, got %d", len(issue.Labels))
 	}
-	if issue.Labels[0].Name != "enhancement" {
-		t.Fatalf("expected remaining label %q, got %q", "enhancement", issue.Labels[0].Name)
+}
+
+func TestUpdateIssueLabelsRemove(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Test", "task", "", []string{"enhancement"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateIssueLabels(1, nil, []string{"enhancement"}); err != nil {
+		t.Fatal(err)
+	}
+
+	issue, err := s.GetIssue(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issue.Labels) != 0 {
+		t.Fatalf("expected 0 labels after remove, got %d", len(issue.Labels))
 	}
 }
 
@@ -615,12 +611,12 @@ func TestGetOrCreateLabelExisting(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
 
-	label, err := s.GetOrCreateLabel("bug")
+	label, err := s.GetOrCreateLabel("enhancement")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if label.Name != "bug" {
-		t.Fatalf("expected name %q, got %q", "bug", label.Name)
+	if label.Name != "enhancement" {
+		t.Fatalf("expected name %q, got %q", "enhancement", label.Name)
 	}
 	if label.Kind != "category" {
 		t.Fatalf("expected kind %q, got %q", "category", label.Kind)

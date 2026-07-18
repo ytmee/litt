@@ -7,7 +7,7 @@ AI agent 的本地优先任务图与执行追踪器。
 ## 功能
 
 - **SQLite 存储 issue** — 不再用易损坏的 Markdown 文件
-- **父子层级** — feature 包含 task
+- **父子层级** — spec 包含 task
 - **阻塞图** — 带环检测的有向依赖
 - **分类 / 类别 / 自定义标签** — 分类标签互斥
 - **派生 ready 查询** — open + 已分类 + 未阻塞，按需计算
@@ -32,7 +32,7 @@ go build -o litt .
 litt init
 
 # 创建 issue
-litt issue create "添加深色模式" --kind feature
+litt issue create "添加深色模式设计" --kind spec
 litt issue create "实现切换按钮" --kind task --body "..."
 
 # 查看待办事项

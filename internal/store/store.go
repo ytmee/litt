@@ -27,7 +27,6 @@ var seedLabels = []Label{
 	{Name: "ready-for-agent", Color: "006B75", Description: "Fully specified, ready for an AFK agent", Kind: "triage"},
 	{Name: "ready-for-human", Color: "bfdadc", Description: "Requires human implementation", Kind: "triage"},
 	{Name: "wontfix", Color: "ffffff", Description: "Will not be actioned", Kind: "triage"},
-	{Name: "bug", Color: "d73a4a", Description: "Something isn't working", Kind: "category"},
 	{Name: "enhancement", Color: "a2eeef", Description: "New feature or request", Kind: "category"},
 }
 

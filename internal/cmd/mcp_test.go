@@ -157,16 +157,15 @@ func TestMCPCreateIssueMissingTitle(t *testing.T) {
 	}
 }
 
-func TestMCPCreateIssueInvalidKind(t *testing.T) {
+func TestMCPCreateIssueDefaultsKind(t *testing.T) {
 	_, session, cleanup := mcpTestSetup(t)
 	defer cleanup()
 
-	errMsg := mcpToolErr(t, session, "create_issue", map[string]any{
-		"kind":  "invalid",
+	text := mcpToolSuccess(t, session, "create_issue", map[string]any{
 		"title": "Test",
 	})
-	if !strings.Contains(errMsg, `must be 'feature' or 'task'`) {
-		t.Fatalf("expected error about invalid kind, got: %s", errMsg)
+	if !strings.Contains(text, `"kind":"task"`) && !strings.Contains(text, `"kind": "task"`) {
+		t.Fatalf("expected kind task in response, got: %s", text)
 	}
 }
 
@@ -348,16 +347,16 @@ func TestMCPQueryIssuesFilterKind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.CreateIssue("Feature", "feature", "", nil)
+	_, err = s.CreateIssue("Spec", "spec", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	text := mcpToolSuccess(t, session, "query_issues", map[string]any{
-		"kind": "feature",
+		"kind": "spec",
 	})
-	if !strings.Contains(text, "Feature") {
-		t.Fatalf("expected 'Feature' in response, got: %s", text)
+	if !strings.Contains(text, "Spec") {
+		t.Fatalf("expected 'Spec' in response, got: %s", text)
 	}
 	if strings.Contains(text, "Task") {
 		t.Fatal("should not contain 'Task'")

@@ -14,7 +14,7 @@ and code blocks to organise content.
 
 | When you need | Call this |
 |---|---|
-| Propose a new feature or task | `create_issue(kind="feature"\|"task", title, ...)` |
+| Create a spec, task, or bug | `create_issue(kind="spec"\|"task"\|"bug", title, ...)` |
 | Find what to work on next | `get_ready_issues` |
 | Mark an issue as done | `update_issue(number, state="closed")` |
 | Break work into subtasks | `create_issue` + `set_parent` |

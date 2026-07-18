@@ -4,13 +4,14 @@
 
 - **Issue**: A unit of work. The core entity.
   - `state: open | closed` — native lifecycle field.
-  - `kind: feature | task` — structural kind. `bug`/`enhancement` are category labels, not kinds.
+  - `kind: spec | task | bug` — structural kind.
   - `parent_issue_id: INTEGER NULL` — optional parent issue. Analogous to GitHub's parent/child.
   - Labels: triage, category, or custom — unified in a labels table.
-- **Feature**: An issue with `kind=feature`. No separate feature table.
+- **Spec**: An issue with `kind=spec`.
+- **Bug**: An issue with `kind=bug`.
 - **Label**: A tag on an issue.
   - `triage`: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`
-  - `category`: `bug`, `enhancement`
+  - `category`: `enhancement`
   - `custom`: user-defined freeform labels
   - `kind` metadata triage/category/custom is advisory, not structural.
 - **Blocking edge**: A directed dependency from one issue to another, stored in `issue_blocks(blocker_issue_id, blocked_issue_id)`. The graph is a DAG.

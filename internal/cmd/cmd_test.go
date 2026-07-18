@@ -138,7 +138,7 @@ func TestLabelList_PrintsLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := []string{"needs-triage", "needs-info", "ready-for-agent", "ready-for-human", "wontfix", "bug", "enhancement"}
+	expected := []string{"needs-triage", "needs-info", "ready-for-agent", "ready-for-human", "wontfix", "enhancement"}
 	for _, name := range expected {
 		if !strings.Contains(out, name) {
 			t.Errorf("output missing label %q", name)
@@ -394,19 +394,19 @@ func TestIssueListFilterKind(t *testing.T) {
 	if _, err := runCmd(t, "issue", "create", "Task", "--kind", "task"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runCmd(t, "issue", "create", "Feature", "--kind", "feature"); err != nil {
+	if _, err := runCmd(t, "issue", "create", "Spec", "--kind", "spec"); err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := runCmd(t, "issue", "list", "--kind", "feature")
+	out, err := runCmd(t, "issue", "list", "--kind", "spec")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "Feature") {
-		t.Fatalf("expected feature in output: %s", out)
+	if !strings.Contains(out, "Spec") {
+		t.Fatalf("expected spec in output: %s", out)
 	}
 	if strings.Contains(out, "Task") {
-		t.Fatal("task should not appear in feature filter")
+		t.Fatal("task should not appear in spec filter")
 	}
 }
 

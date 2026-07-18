@@ -134,23 +134,21 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "litt", Version: "0.1"}, nil)
 
 	type createIssueInput struct {
-		Kind   string   `json:"kind"`
+		Kind   *string  `json:"kind,omitempty"`
 		Title  string   `json:"title"`
 		Body   string   `json:"body,omitempty"`
 		Labels []string `json:"labels,omitempty"`
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "create_issue",
-		Description: "Create a new litt issue. Kind must be 'feature' or 'task'.",
+		Description: "Create a new litt issue. Kind can be 'spec', 'task', or 'bug'.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input createIssueInput) (*mcp.CallToolResult, any, error) {
 		if input.Title == "" {
 			return nil, nil, fmt.Errorf("title is required")
 		}
-		if input.Kind == "" {
-			return nil, nil, fmt.Errorf("kind is required")
-		}
-		if input.Kind != "feature" && input.Kind != "task" {
-			return nil, nil, fmt.Errorf("invalid kind %q: must be 'feature' or 'task'", input.Kind)
+		kind := "task"
+		if input.Kind != nil && *input.Kind != "" {
+			kind = *input.Kind
 		}
 		if input.Labels == nil {
 			input.Labels = []string{}
@@ -159,7 +157,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		issue, err := s.CreateIssue(input.Title, input.Kind, input.Body, input.Labels)
+		issue, err := s.CreateIssue(input.Title, kind, input.Body, input.Labels)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -177,7 +175,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_issue",
-		Description: "Update an existing litt issue. Kind must be 'feature' or 'task' if provided.",
+		Description: "Update an existing litt issue. Kind can be 'spec', 'task', or 'bug' if provided.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input updateIssueInput) (*mcp.CallToolResult, any, error) {
 		s, err := ms.getOrInitStore()
 		if err != nil {

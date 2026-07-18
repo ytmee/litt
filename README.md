@@ -7,7 +7,7 @@ A local-first task graph and execution tracker for AI agents.
 ## Features
 
 - **SQLite-backed issue storage** — no Markdown files to corrupt
-- **Parent/child hierarchy** — features containing tasks
+- **Parent/child hierarchy** — specs containing tasks
 - **Blocking graph** — directed dependencies with cycle detection
 - **Triage / category / custom labels** — mutual exclusion for triage labels
 - **Derived ready query** — open + triaged + unblocked issues, computed on demand
@@ -32,7 +32,7 @@ Or download a binary from the [releases page](https://github.com/ytmee/litt/rele
 litt init
 
 # Create some issues
-litt issue create "Add dark mode" --kind feature
+litt issue create "Add dark mode spec" --kind spec
 litt issue create "Implement toggle" --kind task --body "..."
 
 # See what's ready for work

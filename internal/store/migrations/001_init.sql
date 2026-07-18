@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS issues (
     title TEXT NOT NULL,
     body TEXT NOT NULL DEFAULT '',
     state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'closed')),
-    kind TEXT NOT NULL DEFAULT 'task' CHECK (kind IN ('feature', 'task')),
+    kind TEXT NOT NULL,
     parent_issue_id INTEGER REFERENCES issues(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))

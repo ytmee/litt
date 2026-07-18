@@ -64,7 +64,7 @@ func newIssueCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&kind, "kind", "task", "Issue kind (feature or task)")
+	cmd.Flags().StringVar(&kind, "kind", "task", "Issue kind (spec, task, or bug)")
 	cmd.Flags().StringVar(&body, "body", "", "Issue body")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "Labels to attach (can be specified multiple times)")
 	return cmd
@@ -125,7 +125,7 @@ func newIssueListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&state, "state", "", "Filter by state (open or closed)")
-	cmd.Flags().StringVar(&kind, "kind", "", "Filter by kind (feature or task)")
+	cmd.Flags().StringVar(&kind, "kind", "", "Filter by kind (spec, task, or bug)")
 	cmd.Flags().StringVar(&label, "label", "", "Filter by label name")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
@@ -247,7 +247,7 @@ func newIssueUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&title, "title", "", "New title")
 	cmd.Flags().StringVar(&body, "body", "", "New body")
 	cmd.Flags().StringVar(&state, "state", "", "New state (open or closed)")
-	cmd.Flags().StringVar(&kind, "kind", "", "New kind (feature or task)")
+	cmd.Flags().StringVar(&kind, "kind", "", "New kind (spec, task, or bug)")
 	cmd.Flags().StringSliceVar(&addLabels, "add-label", nil, "Labels to add (can be specified multiple times)")
 	cmd.Flags().StringSliceVar(&removeLabels, "remove-label", nil, "Labels to remove (can be specified multiple times)")
 	return cmd
