@@ -1,8 +1,10 @@
 package store
 
 import (
+	"bytes"
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -151,7 +153,7 @@ func (s *Store) DB() *sql.DB {
 }
 
 type Issue struct {
-	ID            int      `json:"id"`
+	ID            int      `json:"number"`
 	Title         string   `json:"title"`
 	Body          string   `json:"body"`
 	State         string   `json:"state"`
@@ -161,6 +163,28 @@ type Issue struct {
 	CreatedAt     string   `json:"created_at"`
 	UpdatedAt     string   `json:"updated_at"`
 	ClosedAt      *string  `json:"closed_at"`
+}
+
+func (i Issue) MarshalJSON() ([]byte, error) {
+	type issueAlias Issue
+	a := issueAlias(i)
+	if a.Labels == nil {
+		a.Labels = []Label{}
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(struct {
+		issueAlias
+		Ref string `json:"ref"`
+	}{
+		issueAlias: a,
+		Ref:        fmt.Sprintf("#%d", i.ID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
 type UpdateIssueOptions struct {

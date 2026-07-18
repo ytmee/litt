@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,51 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/ytmee/litt/internal/store"
 )
-
-type mcpIssueResponse struct {
-	Number        int           `json:"number"`
-	Ref           string        `json:"ref"`
-	Title         string        `json:"title"`
-	Body          string        `json:"body"`
-	State         string        `json:"state"`
-	Kind          string        `json:"kind"`
-	ParentIssueID *int          `json:"parent_issue_id"`
-	Labels        []store.Label `json:"labels"`
-	CreatedAt     string        `json:"created_at"`
-	UpdatedAt     string        `json:"updated_at"`
-	ClosedAt      *string       `json:"closed_at"`
-}
-
-func (r mcpIssueResponse) MarshalJSON() ([]byte, error) {
-	type alias mcpIssueResponse
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(alias(r)); err != nil {
-		return nil, err
-	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), nil
-}
-
-func newMCPIssue(issue *store.Issue) mcpIssueResponse {
-	labels := issue.Labels
-	if labels == nil {
-		labels = []store.Label{}
-	}
-	return mcpIssueResponse{
-		Number:        issue.ID,
-		Ref:           fmt.Sprintf("#%d", issue.ID),
-		Title:         issue.Title,
-		Body:          issue.Body,
-		State:         issue.State,
-		Kind:          issue.Kind,
-		ParentIssueID: issue.ParentIssueID,
-		Labels:        labels,
-		CreatedAt:     issue.CreatedAt,
-		UpdatedAt:     issue.UpdatedAt,
-		ClosedAt:      issue.ClosedAt,
-	}
-}
 
 type mcpServer struct {
 	store  *store.Store
@@ -174,7 +127,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, newMCPIssue(issue), nil
+		return nil, issue, nil
 	})
 
 	type updateIssueInput struct {
@@ -213,7 +166,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, newMCPIssue(issue), nil
+		return nil, issue, nil
 	})
 
 	type queryIssuesInput struct {
@@ -247,7 +200,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 
 		s := ms.getStore()
 		if s == nil {
-			return nil, map[string]any{"issues": []mcpIssueResponse{}}, nil
+			return nil, map[string]any{"issues": []store.Issue{}}, nil
 		}
 
 		var issues []store.Issue
@@ -319,11 +272,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 			issues = filtered
 		}
 
-		result := make([]mcpIssueResponse, len(issues))
-		for i := range issues {
-			result[i] = newMCPIssue(&issues[i])
-		}
-		return nil, map[string]any{"issues": result}, nil
+		return nil, map[string]any{"issues": issues}, nil
 	})
 
 	type getIssueInput struct {
@@ -341,7 +290,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, newMCPIssue(issue), nil
+		return nil, issue, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -350,17 +299,13 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, any, error) {
 		s := ms.getStore()
 		if s == nil {
-			return nil, map[string]any{"issues": []mcpIssueResponse{}}, nil
+			return nil, map[string]any{"issues": []store.Issue{}}, nil
 		}
 		issues, err := s.ListReadyIssues()
 		if err != nil {
 			return nil, nil, err
 		}
-		result := make([]mcpIssueResponse, len(issues))
-		for i := range issues {
-			result[i] = newMCPIssue(&issues[i])
-		}
-		return nil, map[string]any{"issues": result}, nil
+		return nil, map[string]any{"issues": issues}, nil
 	})
 
 	type setParentInput struct {
@@ -382,7 +327,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, newMCPIssue(issue), nil
+		return nil, issue, nil
 	})
 
 	type clearParentInput struct {
@@ -403,7 +348,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, newMCPIssue(issue), nil
+		return nil, issue, nil
 	})
 
 	type addBlockingInput struct {
