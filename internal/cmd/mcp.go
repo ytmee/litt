@@ -27,6 +27,10 @@ type mcpIssueResponse struct {
 }
 
 func newMCPIssue(issue *store.Issue) mcpIssueResponse {
+	labels := issue.Labels
+	if labels == nil {
+		labels = []store.Label{}
+	}
 	return mcpIssueResponse{
 		Number:        issue.ID,
 		Ref:           fmt.Sprintf("#%d", issue.ID),
@@ -35,7 +39,7 @@ func newMCPIssue(issue *store.Issue) mcpIssueResponse {
 		State:         issue.State,
 		Kind:          issue.Kind,
 		ParentIssueID: issue.ParentIssueID,
-		Labels:        issue.Labels,
+		Labels:        labels,
 		CreatedAt:     issue.CreatedAt,
 		UpdatedAt:     issue.UpdatedAt,
 		ClosedAt:      issue.ClosedAt,
@@ -137,13 +141,16 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "create_issue",
-		Description: "Create a new issue",
+		Description: "Create a new litt issue. Kind must be 'feature' or 'task'.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input createIssueInput) (*mcp.CallToolResult, any, error) {
 		if input.Title == "" {
 			return nil, nil, fmt.Errorf("title is required")
 		}
 		if input.Kind == "" {
 			return nil, nil, fmt.Errorf("kind is required")
+		}
+		if input.Kind != "feature" && input.Kind != "task" {
+			return nil, nil, fmt.Errorf("invalid kind %q: must be 'feature' or 'task'", input.Kind)
 		}
 		if input.Labels == nil {
 			input.Labels = []string{}
@@ -170,7 +177,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_issue",
-		Description: "Update an existing issue",
+		Description: "Update an existing litt issue. Kind must be 'feature' or 'task' if provided.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input updateIssueInput) (*mcp.CallToolResult, any, error) {
 		s, err := ms.getOrInitStore()
 		if err != nil {
@@ -204,7 +211,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "query_issues",
-		Description: "Query issues with optional filters",
+		Description: "Query litt issues with optional filters",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input queryIssuesInput) (*mcp.CallToolResult, any, error) {
 		state := ""
 		kind := ""
@@ -225,7 +232,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 
 		s := ms.getStore()
 		if s == nil {
-			return nil, []mcpIssueResponse{}, nil
+			return nil, map[string]any{"issues": []mcpIssueResponse{}}, nil
 		}
 
 		var issues []store.Issue
@@ -294,7 +301,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		for i := range issues {
 			result[i] = newMCPIssue(&issues[i])
 		}
-		return nil, result, nil
+		return nil, map[string]any{"issues": result}, nil
 	})
 
 	type getIssueInput struct {
@@ -302,7 +309,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_issue",
-		Description: "Get a single issue by number",
+		Description: "Get a single litt issue by number",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input getIssueInput) (*mcp.CallToolResult, any, error) {
 		s := ms.getStore()
 		if s == nil {
@@ -317,11 +324,11 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_ready_issues",
-		Description: "Get issues ready for an agent (open, labeled ready-for-agent, not blocked by open issues)",
+		Description: "Get litt issues ready for an agent (open, labeled ready-for-agent, not blocked by open issues)",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, any, error) {
 		s := ms.getStore()
 		if s == nil {
-			return nil, []mcpIssueResponse{}, nil
+			return nil, map[string]any{"issues": []mcpIssueResponse{}}, nil
 		}
 		issues, err := s.ListReadyIssues()
 		if err != nil {
@@ -331,7 +338,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		for i := range issues {
 			result[i] = newMCPIssue(&issues[i])
 		}
-		return nil, result, nil
+		return nil, map[string]any{"issues": result}, nil
 	})
 
 	type setParentInput struct {
@@ -340,7 +347,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "set_parent",
-		Description: "Set the parent of an issue",
+		Description: "Set the parent of a litt issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input setParentInput) (*mcp.CallToolResult, any, error) {
 		s, err := ms.getOrInitStore()
 		if err != nil {
@@ -361,7 +368,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "clear_parent",
-		Description: "Clear the parent of an issue",
+		Description: "Clear the parent of a litt issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input clearParentInput) (*mcp.CallToolResult, any, error) {
 		s, err := ms.getOrInitStore()
 		if err != nil {
@@ -383,7 +390,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_blocking",
-		Description: "Create a blocking relationship between issues",
+		Description: "Create a blocking relationship between litt issues",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input addBlockingInput) (*mcp.CallToolResult, any, error) {
 		s, err := ms.getOrInitStore()
 		if err != nil {
@@ -405,7 +412,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "remove_blocking",
-		Description: "Remove a blocking relationship between issues",
+		Description: "Remove a blocking relationship between litt issues",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input removeBlockingInput) (*mcp.CallToolResult, any, error) {
 		s, err := ms.getOrInitStore()
 		if err != nil {

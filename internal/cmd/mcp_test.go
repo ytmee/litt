@@ -165,7 +165,7 @@ func TestMCPCreateIssueInvalidKind(t *testing.T) {
 		"kind":  "invalid",
 		"title": "Test",
 	})
-	if !strings.Contains(errMsg, "constraint") && !strings.Contains(errMsg, "kind") {
+	if !strings.Contains(errMsg, `must be 'feature' or 'task'`) {
 		t.Fatalf("expected error about invalid kind, got: %s", errMsg)
 	}
 }
