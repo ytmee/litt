@@ -16,6 +16,7 @@
   - `kind` metadata triage/category/custom is advisory, not structural.
 - **Blocking edge**: A directed dependency from one issue to another, stored in `issue_blocks(blocker_issue_id, blocked_issue_id)`. The graph is a DAG.
 - **Blocked**: An issue with at least one incoming blocking edge from an **open** issue. Closed blockers do not count.
+- **Comment**: A flat, chronologically-ordered entry attached to an issue. No threading. Used by triage skill for agent briefs and triage notes, and by AI agents for execution logs.
 - **Ready**: A derived query: `state=open` + label `ready-for-agent` + no incoming `issue_blocks` from open issues.
 - **MCP**: Model Context Protocol — the interface AI agents use to interact with litt.
 - **CLI**: The command-line interface humans use.

@@ -131,6 +131,39 @@ func (s *Store) SeedLabels() error {
 	return nil
 }
 
+func (s *Store) CreateLabel(name, description, kind string) (*Label, error) {
+	if name == "" {
+		return nil, fmt.Errorf("label name is required")
+	}
+	validKinds := map[string]bool{"triage": true, "category": true, "custom": true}
+	if !validKinds[kind] {
+		return nil, fmt.Errorf("invalid label kind %q: must be one of triage, category, or custom", kind)
+	}
+	_, err := s.db.Exec(
+		"INSERT INTO labels (name, color, description, kind) VALUES (?, 'ffffff', ?, ?)",
+		name, description, kind,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return nil, fmt.Errorf("label %q already exists", name)
+		}
+		return nil, fmt.Errorf("create label %s: %w", name, err)
+	}
+	return s.FindLabel(name)
+}
+
+func (s *Store) DeleteLabel(name string) error {
+	result, err := s.db.Exec("DELETE FROM labels WHERE name = ?", name)
+	if err != nil {
+		return fmt.Errorf("delete label %s: %w", name, err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("label %q not found", name)
+	}
+	return nil
+}
+
 func (s *Store) ListLabels() ([]Label, error) {
 	rows, err := s.db.Query("SELECT id, name, color, description, kind FROM labels ORDER BY id")
 	if err != nil {
@@ -150,6 +183,13 @@ func (s *Store) ListLabels() ([]Label, error) {
 
 func (s *Store) DB() *sql.DB {
 	return s.db
+}
+
+type Comment struct {
+	ID        int    `json:"id"`
+	IssueID   int    `json:"issue_id"`
+	Body      string `json:"body"`
+	CreatedAt string `json:"created_at"`
 }
 
 type Issue struct {
@@ -678,4 +718,55 @@ func (s *Store) CloseIssue(id int) error {
 func (s *Store) ReopenIssue(id int) error {
 	state := "open"
 	return s.UpdateIssue(id, UpdateIssueOptions{State: &state})
+}
+
+func (s *Store) AddComment(issueID int, body string) (*Comment, error) {
+	if body == "" {
+		return nil, fmt.Errorf("comment body is required")
+	}
+	if _, err := s.GetIssue(issueID); err != nil {
+		return nil, err
+	}
+	result, err := s.db.Exec(
+		"INSERT INTO comments (issue_id, body) VALUES (?, ?)",
+		issueID, body,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("add comment: %w", err)
+	}
+	id, _ := result.LastInsertId()
+	return s.getComment(int(id))
+}
+
+func (s *Store) getComment(id int) (*Comment, error) {
+	var c Comment
+	err := s.db.QueryRow(
+		"SELECT id, issue_id, body, created_at FROM comments WHERE id = ?", id,
+	).Scan(&c.ID, &c.IssueID, &c.Body, &c.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get comment %d: %w", id, err)
+	}
+	return &c, nil
+}
+
+func (s *Store) ListComments(issueID int) ([]Comment, error) {
+	if _, err := s.GetIssue(issueID); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(
+		"SELECT id, issue_id, body, created_at FROM comments WHERE issue_id = ? ORDER BY id", issueID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list comments: %w", err)
+	}
+	defer rows.Close()
+	var comments []Comment
+	for rows.Next() {
+		var c Comment
+		if err := rows.Scan(&c.ID, &c.IssueID, &c.Body, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan comment: %w", err)
+		}
+		comments = append(comments, c)
+	}
+	return comments, rows.Err()
 }

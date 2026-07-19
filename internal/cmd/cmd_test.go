@@ -180,6 +180,88 @@ func TestLabelList_NoInit(t *testing.T) {
 	}
 }
 
+func TestLabelCreate(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "label", "create", "my-label")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "my-label") {
+		t.Fatalf("output missing label name: %s", out)
+	}
+
+	out, err = runCmd(t, "label", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "my-label") {
+		t.Fatal("created label not in list")
+	}
+}
+
+func TestLabelCreateDuplicate(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "label", "create", "enhancement")
+	if err == nil {
+		t.Fatal("expected error for duplicate label")
+	}
+}
+
+func TestLabelDelete(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runCmd(t, "label", "create", "my-label"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "label", "delete", "my-label")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Deleted") {
+		t.Fatalf("output missing confirmation: %s", out)
+	}
+
+	out, err = runCmd(t, "label", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "my-label") {
+		t.Fatal("deleted label still in list")
+	}
+}
+
+func TestLabelDeleteNotFound(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "label", "delete", "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for deleting nonexistent label")
+	}
+}
+
 func TestAgentInstructions_PrintsBlock(t *testing.T) {
 	out, err := runCmd(t, "agent", "instructions")
 	if err != nil {
@@ -306,6 +388,67 @@ func TestIssueCreateUnknownLabel(t *testing.T) {
 	_, err := runCmd(t, "issue", "create", "Custom", "--label", "my-custom-label")
 	if err == nil {
 		t.Fatal("expected error for unknown label")
+	}
+}
+
+func TestIssueCreateBodyFile(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	bodyPath := filepath.Join(dir, "body.txt")
+	if err := os.WriteFile(bodyPath, []byte("body from file"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "create", "Body test", "--body-file", bodyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Created") {
+		t.Fatalf("expected created message: %s", out)
+	}
+
+	out, err = runCmd(t, "issue", "show", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "body from file") {
+		t.Fatalf("expected body in output: %s", out)
+	}
+}
+
+func TestIssueUpdateBodyFile(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runCmd(t, "issue", "create", "Update test"); err != nil {
+		t.Fatal(err)
+	}
+
+	bodyPath := filepath.Join(dir, "body.txt")
+	if err := os.WriteFile(bodyPath, []byte("updated body"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := runCmd(t, "issue", "update", "1", "--body-file", bodyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "show", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "updated body") {
+		t.Fatalf("expected updated body in output: %s", out)
 	}
 }
 
@@ -1223,6 +1366,75 @@ func TestDBFlagOverridesDiscovery(t *testing.T) {
 	}
 	if !strings.Contains(out, "No issues found") {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIssueComment(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Test"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "comment", "1", "A test comment")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Added comment") {
+		t.Fatalf("output missing confirmation: %s", out)
+	}
+}
+
+func TestIssueComments(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "comment", "1", "First comment"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "comment", "1", "Second comment"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "comments", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "First comment") {
+		t.Fatalf("output missing first comment: %s", out)
+	}
+	if !strings.Contains(out, "Second comment") {
+		t.Fatalf("output missing second comment: %s", out)
+	}
+}
+
+func TestIssueCommentsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Test"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "comments", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "No comments") {
+		t.Fatalf("expected no comments message: %s", out)
 	}
 }
 

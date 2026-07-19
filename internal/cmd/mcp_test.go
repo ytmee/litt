@@ -109,6 +109,8 @@ func TestMCPToolsList(t *testing.T) {
 	expected := []string{
 		"create_issue", "update_issue", "query_issues", "get_issue",
 		"get_ready_issues", "set_parent", "clear_parent", "add_blocking", "remove_blocking",
+		"add_comment", "get_comments",
+		"create_label", "delete_label", "list_labels",
 	}
 	if len(res.Tools) != len(expected) {
 		t.Fatalf("expected %d tools, got %d", len(expected), len(res.Tools))
@@ -666,6 +668,86 @@ func TestMCPRemoveBlockingNotFound(t *testing.T) {
 	})
 	if !strings.Contains(errMsg, "not found") {
 		t.Fatalf("expected 'block edge not found' error, got: %s", errMsg)
+	}
+}
+
+func TestMCPAddComment(t *testing.T) {
+	s, session, cleanup := mcpTestSetup(t)
+	defer cleanup()
+
+	_, err := s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := mcpToolSuccess(t, session, "add_comment", map[string]any{
+		"number": 1,
+		"body":   "A test comment",
+	})
+	if !strings.Contains(text, "A test comment") {
+		t.Fatalf("expected comment body in response, got: %s", text)
+	}
+	if !strings.Contains(text, "1") {
+		t.Fatalf("expected issue_id in response, got: %s", text)
+	}
+}
+
+func TestMCPAddCommentEmptyBody(t *testing.T) {
+	_, session, cleanup := mcpTestSetup(t)
+	defer cleanup()
+
+	errMsg := mcpToolErr(t, session, "add_comment", map[string]any{
+		"number": 1,
+		"body":   "",
+	})
+	if !strings.Contains(errMsg, "body is required") {
+		t.Fatalf("expected body required error, got: %s", errMsg)
+	}
+}
+
+func TestMCPGetComments(t *testing.T) {
+	s, session, cleanup := mcpTestSetup(t)
+	defer cleanup()
+
+	_, err := s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = s.AddComment(1, "First")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.AddComment(1, "Second")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := mcpToolSuccess(t, session, "get_comments", map[string]any{
+		"number": 1,
+	})
+	if !strings.Contains(text, "First") {
+		t.Fatalf("expected first comment in response, got: %s", text)
+	}
+	if !strings.Contains(text, "Second") {
+		t.Fatalf("expected second comment in response, got: %s", text)
+	}
+}
+
+func TestMCPGetCommentsEmpty(t *testing.T) {
+	s, session, cleanup := mcpTestSetup(t)
+	defer cleanup()
+
+	_, err := s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := mcpToolSuccess(t, session, "get_comments", map[string]any{
+		"number": 1,
+	})
+	if text != `{"comments":[]}` {
+		t.Fatalf("expected empty comments, got: %s", text)
 	}
 }
 

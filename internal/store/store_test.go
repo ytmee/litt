@@ -20,8 +20,8 @@ func TestMigrate(t *testing.T) {
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatalf("expected 2 migrations, got %d", count)
+	if count != 3 {
+		t.Fatalf("expected 3 migrations, got %d", count)
 	}
 }
 
@@ -43,8 +43,8 @@ func TestMigrateIdempotent(t *testing.T) {
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatalf("expected 2 migrations after second run, got %d", count)
+	if count != 3 {
+		t.Fatalf("expected 3 migrations after second run, got %d", count)
 	}
 }
 
@@ -924,6 +924,136 @@ func TestListBlocking(t *testing.T) {
 	}
 }
 
+func TestAddComment(t *testing.T) {
+	s, err := OpenInMemory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+
+	issue, err := s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := s.AddComment(issue.ID, "A test comment")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Body != "A test comment" {
+		t.Fatalf("expected body 'A test comment', got %q", c.Body)
+	}
+	if c.IssueID != issue.ID {
+		t.Fatalf("expected issue_id %d, got %d", issue.ID, c.IssueID)
+	}
+}
+
+func TestAddCommentEmptyBody(t *testing.T) {
+	s, err := OpenInMemory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = s.AddComment(1, "")
+	if err == nil {
+		t.Fatal("expected error for empty comment body")
+	}
+}
+
+func TestAddCommentNonexistentIssue(t *testing.T) {
+	s, err := OpenInMemory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = s.AddComment(999, "comment")
+	if err == nil {
+		t.Fatal("expected error for nonexistent issue")
+	}
+}
+
+func TestListComments(t *testing.T) {
+	s, err := OpenInMemory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+
+	issue, err := s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddComment(issue.ID, "First"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(issue.ID, "Second"); err != nil {
+		t.Fatal(err)
+	}
+
+	comments, err := s.ListComments(issue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(comments) != 2 {
+		t.Fatalf("expected 2 comments, got %d", len(comments))
+	}
+	if comments[0].Body != "First" {
+		t.Fatalf("expected first comment 'First', got %q", comments[0].Body)
+	}
+	if comments[1].Body != "Second" {
+		t.Fatalf("expected second comment 'Second', got %q", comments[1].Body)
+	}
+}
+
+func TestListCommentsEmpty(t *testing.T) {
+	s, err := OpenInMemory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+
+	issue, err := s.CreateIssue("Test", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	comments, err := s.ListComments(issue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(comments) != 0 {
+		t.Fatalf("expected 0 comments, got %d", len(comments))
+	}
+}
+
 func TestTablesCreated(t *testing.T) {
 	s, err := OpenInMemory()
 	if err != nil {
@@ -935,7 +1065,7 @@ func TestTablesCreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedTables := []string{"issues", "labels", "issue_labels", "issue_blocks", "schema_migrations"}
+	expectedTables := []string{"issues", "labels", "issue_labels", "issue_blocks", "comments", "schema_migrations"}
 	for _, name := range expectedTables {
 		var count int
 		err := s.db.QueryRow(

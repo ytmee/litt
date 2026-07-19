@@ -79,7 +79,8 @@ litt issue block 2 1
 
 **MCP server** — `litt mcp` starts a stdio MCP server with tools for all issue
 operations: `create_issue`, `update_issue`, `query_issues`, `get_issue`,
-`get_ready_issues`, `set_parent`, `clear_parent`, `add_blocking`, `remove_blocking`.
+`get_ready_issues`, `set_parent`, `clear_parent`, `add_blocking`, `remove_blocking`,
+`add_comment`, `get_comments`, `create_label`, `delete_label`, `list_labels`.
 
 Add to your agent's MCP configuration:
 

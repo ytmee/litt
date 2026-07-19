@@ -21,3 +21,8 @@ and code blocks to organise content.
 | Express a dependency | `add_blocking(blocker_number, blocked_number)` |
 | Read issue details | `get_issue(number)` |
 | Search by state/kind/label | `query_issues(state?, kind?, label?, ...)` |
+| Create a label | `create_label(name, kind?, description?)` |
+| Delete a label | `delete_label(name)` |
+| List all labels | `list_labels` |
+| Add a comment to an issue | `add_comment(number, body)` |
+| List comments on an issue | `get_comments(number)` |

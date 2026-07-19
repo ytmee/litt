@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -10,6 +12,28 @@ import (
 	"github.com/ytmee/litt/internal/query"
 	"github.com/ytmee/litt/internal/store"
 )
+
+func readBodyFile(path string) (string, error) {
+	if path == "-" {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return "", fmt.Errorf("read stdin: %w", err)
+		}
+		return strings.TrimRight(string(data), "\n"), nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read body file: %w", err)
+	}
+	return strings.TrimRight(string(data), "\n"), nil
+}
+
+func resolveBody(cmd *cobra.Command, body, bodyFile string) (string, error) {
+	if cmd.Flags().Changed("body-file") {
+		return readBodyFile(bodyFile)
+	}
+	return body, nil
+}
 
 func newIssueCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -29,6 +53,8 @@ func newIssueCmd() *cobra.Command {
 	cmd.AddCommand(newIssueBlockedByCmd())
 	cmd.AddCommand(newIssueBlockingCmd())
 	cmd.AddCommand(newIssueReadyCmd())
+	cmd.AddCommand(newIssueCommentCmd())
+	cmd.AddCommand(newIssueCommentsCmd())
 	return cmd
 }
 
@@ -44,6 +70,7 @@ func parseIssueNumber(s string) (int, error) {
 func newIssueCreateCmd() *cobra.Command {
 	var kind string
 	var body string
+	var bodyFile string
 	var labels []string
 
 	cmd := &cobra.Command{
@@ -51,6 +78,12 @@ func newIssueCreateCmd() *cobra.Command {
 		Short: "Create a new issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			b, err := resolveBody(cmd, body, bodyFile)
+			if err != nil {
+				return err
+			}
+			body = b
+
 			s, err := openStore(cmd)
 			if err != nil {
 				return err
@@ -67,6 +100,7 @@ func newIssueCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&kind, "kind", "task", "Issue kind (spec, task, or bug)")
 	cmd.Flags().StringVar(&body, "body", "", "Issue body")
+	cmd.Flags().StringVar(&bodyFile, "body-file", "", "Read body from file (use '-' for stdin)")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "Labels to attach (can be specified multiple times)")
 	return cmd
 }
@@ -206,6 +240,7 @@ func newIssueShowCmd() *cobra.Command {
 func newIssueUpdateCmd() *cobra.Command {
 	var title string
 	var body string
+	var bodyFile string
 	var state string
 	var kind string
 	var addLabels []string
@@ -216,6 +251,12 @@ func newIssueUpdateCmd() *cobra.Command {
 		Short: "Update an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			b, err := resolveBody(cmd, body, bodyFile)
+			if err != nil {
+				return err
+			}
+			body = b
+
 			id, err := parseIssueNumber(args[0])
 			if err != nil {
 				return err
@@ -234,7 +275,7 @@ func newIssueUpdateCmd() *cobra.Command {
 			if cmd.Flags().Changed("title") {
 				opts.Title = &title
 			}
-			if cmd.Flags().Changed("body") {
+			if cmd.Flags().Changed("body") || cmd.Flags().Changed("body-file") {
 				opts.Body = &body
 			}
 			if cmd.Flags().Changed("state") {
@@ -253,6 +294,7 @@ func newIssueUpdateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&title, "title", "", "New title")
 	cmd.Flags().StringVar(&body, "body", "", "New body")
+	cmd.Flags().StringVar(&bodyFile, "body-file", "", "Read body from file (use '-' for stdin)")
 	cmd.Flags().StringVar(&state, "state", "", "New state (open or closed)")
 	cmd.Flags().StringVar(&kind, "kind", "", "New kind (spec, task, or bug)")
 	cmd.Flags().StringSliceVar(&addLabels, "add-label", nil, "Labels to add (can be specified multiple times)")
@@ -602,4 +644,67 @@ func newIssueReadyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	cmd.Flags().IntVar(&parentID, "parent-id", 0, "Filter by parent issue ID (0 for top-level issues)")
 	return cmd
+}
+
+func newIssueCommentCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "comment <number> <body>",
+		Short: "Add a comment to an issue",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore(cmd)
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			comment, err := s.AddComment(id, args[1])
+			if err != nil {
+				return fmt.Errorf("add comment: %w", err)
+			}
+			cmd.Printf("Added comment #%d to issue #%d\n", comment.ID, comment.IssueID)
+			return nil
+		},
+	}
+}
+
+func newIssueCommentsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "comments <number>",
+		Short: "List comments on an issue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseIssueNumber(args[0])
+			if err != nil {
+				return err
+			}
+
+			s, err := openStore(cmd)
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			comments, err := s.ListComments(id)
+			if err != nil {
+				return fmt.Errorf("list comments: %w", err)
+			}
+
+			if len(comments) == 0 {
+				cmd.Printf("No comments on issue #%d.\n", id)
+				return nil
+			}
+
+			for _, c := range comments {
+				cmd.Printf("#%-3d %s\n", c.ID, c.CreatedAt)
+				cmd.Printf("     %s\n", c.Body)
+			}
+			return nil
+		},
+	}
 }

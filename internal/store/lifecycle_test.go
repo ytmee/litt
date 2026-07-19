@@ -20,8 +20,8 @@ func TestEnsure_CreatesAndMigrates(t *testing.T) {
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatalf("expected 2 migrations, got %d", count)
+	if count != 3 {
+		t.Fatalf("expected 3 migrations, got %d", count)
 	}
 
 	labels, err := s.ListLabels()
@@ -53,8 +53,8 @@ func TestEnsure_Idempotent(t *testing.T) {
 	if err := s2.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatalf("expected 2 migrations, got %d", count)
+	if count != 3 {
+		t.Fatalf("expected 3 migrations, got %d", count)
 	}
 }
 

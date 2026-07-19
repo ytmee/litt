@@ -79,7 +79,8 @@ litt issue block 2 1
 
 **MCP 服务** — `litt mcp` 启动一个 stdio MCP 服务，提供所有 issue 操作工具：
 `create_issue`, `update_issue`, `query_issues`, `get_issue`,
-`get_ready_issues`, `set_parent`, `clear_parent`, `add_blocking`, `remove_blocking`。
+`get_ready_issues`, `set_parent`, `clear_parent`, `add_blocking`, `remove_blocking`,
+`add_comment`, `get_comments`, `create_label`, `delete_label`, `list_labels`。
 
 在 agent 的 MCP 配置中添加：
 

@@ -320,5 +320,117 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		return nil, map[string]interface{}{"success": true}, nil
 	})
 
+	type addCommentInput struct {
+		Number int    `json:"number"`
+		Body   string `json:"body"`
+	}
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "add_comment",
+		Description: "Add a comment to a litt issue",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, input addCommentInput) (*mcp.CallToolResult, any, error) {
+		if input.Body == "" {
+			return nil, nil, fmt.Errorf("body is required")
+		}
+		s, err := ms.storeForWrite()
+		if err != nil {
+			return nil, nil, err
+		}
+		comment, err := s.AddComment(input.Number, input.Body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, comment, nil
+	})
+
+	type getCommentsInput struct {
+		Number int `json:"number"`
+	}
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_comments",
+		Description: "List comments on a litt issue",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, input getCommentsInput) (*mcp.CallToolResult, any, error) {
+		s := ms.storeForRead()
+		if s == nil {
+			return nil, map[string]any{"comments": []store.Comment{}}, nil
+		}
+		comments, err := s.ListComments(input.Number)
+		if err != nil {
+			return nil, nil, err
+		}
+		if comments == nil {
+			comments = []store.Comment{}
+		}
+		return nil, map[string]any{"comments": comments}, nil
+	})
+
+	type createLabelInput struct {
+		Name        string  `json:"name"`
+		Kind        *string `json:"kind,omitempty"`
+		Description *string `json:"description,omitempty"`
+	}
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "create_label",
+		Description: "Create a new litt label",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, input createLabelInput) (*mcp.CallToolResult, any, error) {
+		if input.Name == "" {
+			return nil, nil, fmt.Errorf("name is required")
+		}
+		kind := "custom"
+		if input.Kind != nil {
+			kind = *input.Kind
+		}
+		desc := ""
+		if input.Description != nil {
+			desc = *input.Description
+		}
+		s, err := ms.storeForWrite()
+		if err != nil {
+			return nil, nil, err
+		}
+		label, err := s.CreateLabel(input.Name, desc, kind)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, label, nil
+	})
+
+	type deleteLabelInput struct {
+		Name string `json:"name"`
+	}
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "delete_label",
+		Description: "Delete a litt label by name",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, input deleteLabelInput) (*mcp.CallToolResult, any, error) {
+		if input.Name == "" {
+			return nil, nil, fmt.Errorf("name is required")
+		}
+		s, err := ms.storeForWrite()
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := s.DeleteLabel(input.Name); err != nil {
+			return nil, nil, err
+		}
+		return nil, map[string]any{"success": true}, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "list_labels",
+		Description: "List all litt labels",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, any, error) {
+		s := ms.storeForRead()
+		if s == nil {
+			return nil, map[string]any{"labels": []store.Label{}}, nil
+		}
+		labels, err := s.ListLabels()
+		if err != nil {
+			return nil, nil, err
+		}
+		if labels == nil {
+			labels = []store.Label{}
+		}
+		return nil, map[string]any{"labels": labels}, nil
+	})
+
 	return server
 }
