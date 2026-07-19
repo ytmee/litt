@@ -283,7 +283,7 @@ func TestListIssuesDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	issues, err := s.ListIssues("", "", "")
+	issues, err := s.ListIssues("", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func TestListIssuesFilterState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	openIssues, err := s.ListIssues("open", "", "")
+	openIssues, err := s.ListIssues("open", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestListIssuesFilterState(t *testing.T) {
 		t.Fatalf("expected 1 open issue, got %d", len(openIssues))
 	}
 
-	closedIssues, err := s.ListIssues("closed", "", "")
+	closedIssues, err := s.ListIssues("closed", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestListIssuesFilterKind(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	specs, err := s.ListIssues("", "spec", "")
+	specs, err := s.ListIssues("", "spec", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,12 +360,56 @@ func TestListIssuesFilterLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bugIssues, err := s.ListIssues("", "bug", "")
+	bugIssues, err := s.ListIssues("", "bug", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(bugIssues) != 1 {
 		t.Fatalf("expected 1 issue with kind bug, got %d", len(bugIssues))
+	}
+}
+
+func TestListIssuesFilterParentID(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Parent", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		_, err := s.CreateIssue(fmt.Sprintf("Child %d", i+1), "task", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err = s.CreateIssue("Orphan", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, id := range []int{2, 3, 4} {
+		if err := s.SetParent(id, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pid1 := 1
+	children, err := s.ListIssues("", "", "", &pid1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(children) != 3 {
+		t.Fatalf("expected 3 children, got %d", len(children))
+	}
+
+	pid0 := 0
+	topLevel, err := s.ListIssues("", "", "", &pid0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(topLevel) != 2 {
+		t.Fatalf("expected 2 top-level issues (#1 and #5), got %d", len(topLevel))
 	}
 }
 

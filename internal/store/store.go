@@ -329,7 +329,7 @@ func (s *Store) GetIssue(id int) (*Issue, error) {
 	return &issue, nil
 }
 
-func (s *Store) ListIssues(state, kind, label string) ([]Issue, error) {
+func (s *Store) ListIssues(state, kind, label string, parentID *int) ([]Issue, error) {
 	query := `SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at FROM issues i`
 	var args []interface{}
 	var conditions []string
@@ -346,6 +346,14 @@ func (s *Store) ListIssues(state, kind, label string) ([]Issue, error) {
 	if kind != "" {
 		conditions = append(conditions, "i.kind = ?")
 		args = append(args, kind)
+	}
+	if parentID != nil {
+		if *parentID == 0 {
+			conditions = append(conditions, "i.parent_issue_id IS NULL")
+		} else {
+			conditions = append(conditions, "i.parent_issue_id = ?")
+			args = append(args, *parentID)
+		}
 	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
@@ -532,33 +540,7 @@ func (s *Store) ClearParent(id int) error {
 }
 
 func (s *Store) ListChildren(parentID int) ([]Issue, error) {
-	rows, err := s.db.Query(
-		`SELECT id, title, body, state, kind, parent_issue_id, created_at, updated_at, closed_at
-		 FROM issues WHERE parent_issue_id = ? ORDER BY id`, parentID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list children: %w", err)
-	}
-	defer rows.Close()
-	var issues []Issue
-	for rows.Next() {
-		var i Issue
-		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
-			return nil, fmt.Errorf("scan child: %w", err)
-		}
-		issues = append(issues, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for idx := range issues {
-		labels, err := s.getIssueLabels(issues[idx].ID)
-		if err != nil {
-			return nil, err
-		}
-		issues[idx].Labels = labels
-	}
-	return issues, nil
+	return s.ListIssues("", "", "", &parentID)
 }
 
 func (s *Store) CreateBlock(blockerID, blockedID int) (bool, error) {

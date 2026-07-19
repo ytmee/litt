@@ -28,7 +28,7 @@ func (m *mockReader) ListBlocking(issueID int) ([]store.Issue, error) {
 	return m.blocking[issueID], nil
 }
 
-func (m *mockReader) ListIssues(state, kind, label string) ([]store.Issue, error) {
+func (m *mockReader) ListIssues(state, kind, label string, parentID *int) ([]store.Issue, error) {
 	if m.blockErr != nil {
 		return nil, m.blockErr
 	}
@@ -49,6 +49,14 @@ func (m *mockReader) ListIssues(state, kind, label string) ([]store.Issue, error
 				}
 			}
 			if !hasLabel {
+				continue
+			}
+		}
+		if parentID != nil {
+			if *parentID == 0 && issue.ParentIssueID != nil {
+				continue
+			}
+			if *parentID != 0 && (issue.ParentIssueID == nil || *issue.ParentIssueID != *parentID) {
 				continue
 			}
 		}

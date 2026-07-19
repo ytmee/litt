@@ -152,6 +152,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		State          *string `json:"state,omitempty"`
 		Kind           *string `json:"kind,omitempty"`
 		Label          *string `json:"label,omitempty"`
+		ParentID       *int    `json:"parent_id,omitempty"`
 		IsBlocked      *bool   `json:"is_blocked,omitempty"`
 		BlocksIssue    *int    `json:"blocks_issue,omitempty"`
 		BlockedByIssue *int    `json:"blocked_by_issue,omitempty"`
@@ -190,6 +191,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 			State:          state,
 			Kind:           kind,
 			Label:          label,
+			ParentID:       input.ParentID,
 			IsBlocked:      input.IsBlocked,
 			BlocksIssue:    blocksIssue,
 			BlockedByIssue: blockedByIssue,

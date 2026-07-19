@@ -75,6 +75,7 @@ func newIssueListCmd() *cobra.Command {
 	var state string
 	var kind string
 	var label string
+	var parentID int
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
@@ -91,7 +92,11 @@ func newIssueListCmd() *cobra.Command {
 			if filterState == "" {
 				filterState = "open"
 			}
-			issues, err := s.ListIssues(filterState, kind, label)
+			var pid *int
+			if cmd.Flags().Changed("parent-id") {
+				pid = &parentID
+			}
+			issues, err := s.ListIssues(filterState, kind, label, pid)
 			if err != nil {
 				return fmt.Errorf("list issues: %w", err)
 			}
@@ -128,6 +133,7 @@ func newIssueListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&state, "state", "", "Filter by state (open or closed)")
 	cmd.Flags().StringVar(&kind, "kind", "", "Filter by kind (spec, task, or bug)")
 	cmd.Flags().StringVar(&label, "label", "", "Filter by label name")
+	cmd.Flags().IntVar(&parentID, "parent-id", 0, "Filter by parent issue ID (0 for top-level issues)")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
 }
@@ -542,6 +548,7 @@ func newIssueBlockingCmd() *cobra.Command {
 
 func newIssueReadyCmd() *cobra.Command {
 	var jsonOutput bool
+	var parentID int
 
 	cmd := &cobra.Command{
 		Use:   "ready",
@@ -553,7 +560,12 @@ func newIssueReadyCmd() *cobra.Command {
 			}
 			defer s.Close()
 
-			issues, err := query.ListReady(s)
+			var issues []store.Issue
+			if cmd.Flags().Changed("parent-id") {
+				issues, err = query.ListReady(s, parentID)
+			} else {
+				issues, err = query.ListReady(s)
+			}
 			if err != nil {
 				return fmt.Errorf("list ready issues: %w", err)
 			}
@@ -588,5 +600,6 @@ func newIssueReadyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	cmd.Flags().IntVar(&parentID, "parent-id", 0, "Filter by parent issue ID (0 for top-level issues)")
 	return cmd
 }

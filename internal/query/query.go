@@ -7,7 +7,7 @@ import (
 )
 
 type issueReader interface {
-	ListIssues(state, kind, label string) ([]store.Issue, error)
+	ListIssues(state, kind, label string, parentID *int) ([]store.Issue, error)
 	ListBlockedBy(issueID int) ([]store.Issue, error)
 	ListBlocking(issueID int) ([]store.Issue, error)
 }
@@ -16,6 +16,7 @@ type Params struct {
 	State          string
 	Kind           string
 	Label          string
+	ParentID       *int
 	IsBlocked      *bool
 	BlocksIssue    int
 	BlockedByIssue int
@@ -39,7 +40,7 @@ func ListIssues(reader issueReader, params Params) ([]store.Issue, error) {
 		return filterPost(issues, params), nil
 	}
 
-	issues, err := reader.ListIssues(params.State, params.Kind, params.Label)
+	issues, err := reader.ListIssues(params.State, params.Kind, params.Label, params.ParentID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +50,12 @@ func ListIssues(reader issueReader, params Params) ([]store.Issue, error) {
 	return issues, nil
 }
 
-func ListReady(reader issueReader) ([]store.Issue, error) {
-	issues, err := reader.ListIssues("open", "", "ready-for-agent")
+func ListReady(reader issueReader, parentID ...int) ([]store.Issue, error) {
+	var pid *int
+	if len(parentID) > 0 {
+		pid = &parentID[0]
+	}
+	issues, err := reader.ListIssues("open", "", "ready-for-agent", pid)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +63,7 @@ func ListReady(reader issueReader) ([]store.Issue, error) {
 }
 
 func filterPost(issues []store.Issue, params Params) []store.Issue {
-	if params.State == "" && params.Kind == "" && params.Label == "" {
+	if params.State == "" && params.Kind == "" && params.Label == "" && params.ParentID == nil {
 		return issues
 	}
 	filtered := make([]store.Issue, 0)
@@ -71,6 +76,14 @@ func filterPost(issues []store.Issue, params Params) []store.Issue {
 		}
 		if params.Label != "" {
 			if !hasLabel(issue, params.Label) {
+				continue
+			}
+		}
+		if params.ParentID != nil {
+			if *params.ParentID == 0 && issue.ParentIssueID != nil {
+				continue
+			}
+			if *params.ParentID != 0 && (issue.ParentIssueID == nil || *issue.ParentIssueID != *params.ParentID) {
 				continue
 			}
 		}
