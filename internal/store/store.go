@@ -379,6 +379,9 @@ func (s *Store) ListIssues(state, kind, label string) ([]Issue, error) {
 }
 
 func (s *Store) UpdateIssue(id int, opts UpdateIssueOptions) error {
+	if _, err := s.GetIssue(id); err != nil {
+		return err
+	}
 	var setClauses []string
 	var args []interface{}
 
@@ -415,13 +418,9 @@ func (s *Store) UpdateIssue(id int, opts UpdateIssueOptions) error {
 		setClauses = append(setClauses, "updated_at = datetime('now')")
 		query := "UPDATE issues SET " + strings.Join(setClauses, ", ") + " WHERE id = ?"
 		args = append(args, id)
-		result, err := s.db.Exec(query, args...)
+		_, err := s.db.Exec(query, args...)
 		if err != nil {
 			return fmt.Errorf("update issue %d: %w", id, err)
-		}
-		n, _ := result.RowsAffected()
-		if n == 0 {
-			return fmt.Errorf("issue %d not found", id)
 		}
 	}
 
