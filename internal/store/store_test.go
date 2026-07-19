@@ -278,7 +278,7 @@ func TestListIssuesDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.CreateIssue("Issue 2", "feature", "", nil)
+	_, err = s.CreateIssue("Issue 2", "spec", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

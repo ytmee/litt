@@ -135,10 +135,11 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		}
 		hasFields := input.Title != nil || input.Body != nil || input.State != nil || input.Kind != nil ||
 			len(input.AddLabels) > 0 || len(input.RemoveLabels) > 0
-		if hasFields {
-			if err := s.UpdateIssue(input.Number, opts); err != nil {
-				return nil, nil, err
-			}
+		if !hasFields {
+			return nil, nil, fmt.Errorf("no fields to update")
+		}
+		if err := s.UpdateIssue(input.Number, opts); err != nil {
+			return nil, nil, err
 		}
 		issue, err := s.GetIssue(input.Number)
 		if err != nil {

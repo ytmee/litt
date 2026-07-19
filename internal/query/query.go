@@ -61,7 +61,7 @@ func filterPost(issues []store.Issue, params Params) []store.Issue {
 	if params.State == "" && params.Kind == "" && params.Label == "" {
 		return issues
 	}
-	var filtered []store.Issue
+	filtered := make([]store.Issue, 0)
 	for _, issue := range issues {
 		if params.State != "" && issue.State != params.State {
 			continue
@@ -80,7 +80,7 @@ func filterPost(issues []store.Issue, params Params) []store.Issue {
 }
 
 func filterBlocked(reader issueReader, issues []store.Issue, wantBlocked bool) ([]store.Issue, error) {
-	var filtered []store.Issue
+	filtered := make([]store.Issue, 0)
 	for _, issue := range issues {
 		blockers, err := reader.ListBlockedBy(issue.ID)
 		if err != nil {

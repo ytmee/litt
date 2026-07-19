@@ -250,7 +250,26 @@ func (s *Store) getIssueLabels(issueID int) ([]Label, error) {
 	return labels, rows.Err()
 }
 
+var ValidKinds = map[string]bool{
+	"spec": true,
+	"task": true,
+	"bug":  true,
+}
+
+func validateKind(kind string) error {
+	if !ValidKinds[kind] {
+		return fmt.Errorf("invalid kind %q: must be one of spec, task, or bug", kind)
+	}
+	return nil
+}
+
 func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (*Issue, error) {
+	if title == "" {
+		return nil, fmt.Errorf("title is required")
+	}
+	if err := validateKind(kind); err != nil {
+		return nil, err
+	}
 	result, err := s.db.Exec(
 		"INSERT INTO issues (title, kind, body) VALUES (?, ?, ?)",
 		title, kind, body,
@@ -338,7 +357,7 @@ func (s *Store) ListIssues(state, kind, label string) ([]Issue, error) {
 		return nil, fmt.Errorf("list issues: %w", err)
 	}
 	defer rows.Close()
-	var issues []Issue
+	issues := make([]Issue, 0)
 	for rows.Next() {
 		var i Issue
 		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
@@ -372,6 +391,9 @@ func (s *Store) UpdateIssue(id int, opts UpdateIssueOptions) error {
 		args = append(args, *opts.Body)
 	}
 	if opts.Kind != nil {
+		if err := validateKind(*opts.Kind); err != nil {
+			return err
+		}
 		setClauses = append(setClauses, "kind = ?")
 		args = append(args, *opts.Kind)
 	}
@@ -613,7 +635,7 @@ func (s *Store) ListBlockedBy(issueID int) ([]Issue, error) {
 		return nil, fmt.Errorf("list blocked by: %w", err)
 	}
 	defer rows.Close()
-	var issues []Issue
+	issues := make([]Issue, 0)
 	for rows.Next() {
 		var i Issue
 		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
@@ -646,7 +668,7 @@ func (s *Store) ListBlocking(issueID int) ([]Issue, error) {
 		return nil, fmt.Errorf("list blocking: %w", err)
 	}
 	defer rows.Close()
-	var issues []Issue
+	issues := make([]Issue, 0)
 	for rows.Next() {
 		var i Issue
 		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
