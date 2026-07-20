@@ -16,5 +16,6 @@ func NewRootCmd(version string) *cobra.Command {
 	cmd.AddCommand(newLabelCmd())
 	cmd.AddCommand(newAgentCmd())
 	cmd.AddCommand(newMCPCmd())
+	cmd.AddCommand(newTUICmd())
 	return cmd
 }
