@@ -87,9 +87,6 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "create_issue",
 		Description: "Create a new litt issue. Kind can be 'spec', 'task', or 'bug'.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input createIssueInput) (*mcp.CallToolResult, any, error) {
-		if input.Title == "" {
-			return nil, nil, fmt.Errorf("title is required")
-		}
 		kind := "task"
 		if input.Kind != nil && *input.Kind != "" {
 			kind = *input.Kind
@@ -132,11 +129,6 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 			Kind:         input.Kind,
 			AddLabels:    input.AddLabels,
 			RemoveLabels: input.RemoveLabels,
-		}
-		hasFields := input.Title != nil || input.Body != nil || input.State != nil || input.Kind != nil ||
-			len(input.AddLabels) > 0 || len(input.RemoveLabels) > 0
-		if !hasFields {
-			return nil, nil, fmt.Errorf("no fields to update")
 		}
 		if err := s.UpdateIssue(input.Number, opts); err != nil {
 			return nil, nil, err
@@ -328,9 +320,6 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "add_comment",
 		Description: "Add a comment to a litt issue",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input addCommentInput) (*mcp.CallToolResult, any, error) {
-		if input.Body == "" {
-			return nil, nil, fmt.Errorf("body is required")
-		}
 		s, err := ms.storeForWrite()
 		if err != nil {
 			return nil, nil, err
@@ -372,9 +361,6 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 		Name:        "create_label",
 		Description: "Create a new litt label",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input createLabelInput) (*mcp.CallToolResult, any, error) {
-		if input.Name == "" {
-			return nil, nil, fmt.Errorf("name is required")
-		}
 		kind := "custom"
 		if input.Kind != nil {
 			kind = *input.Kind

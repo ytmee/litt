@@ -115,40 +115,45 @@ litt issue block 2 1
 （用 `--target CLAUDE.md` 指定 Claude Code），告知 agent 使用 litt
 而非 Markdown 文件来管理 issue。
 
-## 性能
+## 基准测试
 
-```
-环境:          SQLite (WAL 模式), ext4, AMD64, 5,600 issues 数据集
-CLI 开销:      ~6ms/调用 (进程启动)
-MCP 模式:      消除进程开销，预期 3-5x 提升
+环境: SQLite (WAL), ext4, AMD64, 5,752 issues 数据集
+CLI 开销: ~6ms/调用 (进程启动)
 
-顺序吞吐量 (单进程):
-  Issue create  ..............  266/s       (1.9ms each)
-  Issue update  ..............  270/s       (3.7ms each)
-  Issue show (by ID) .........  278 qps     (3.6ms each)
-  Issue list (700 issues) ....   41 qps     (55ms each)
-  Issue list (5,600 issues) ..    6 qps     (147ms each)
-  Create edge (blocking) .....  267/s       (3.7ms each)
-  Add comment ................  258/s       (3.9ms each)
-  Create label ...............  235/s       (4.3ms each)
-  Mixed pipeline (C+R+U+C) ..  257 ops/s   (15ms per 4-op pipeline)
-  Large body (100KB) .........    9ms       (single issue)
-  Large body (1MB) ...........   20ms       (single issue)
+### 顺序吞吐量 (单进程)
 
-并发吞吐量 (并行进程, WAL 模式):
-  4 workers create ...........  769/s       (3.0x vs sequential)
-  16 workers create .......... 1,059/s      (4.1x)
-  32 workers create .......... 1,161/s      (4.5x, 接近饱和)
-  4 workers mixed R+W ........  806 ops/s   (3.1x)
-  4 workers same-issue race ..  735/s       (2.8x, 零死锁)
-  8 workers query ............  213 qps     (5.2x)
+| 操作 | 吞吐量 | 延迟 |
+|---|---|---|
+| Issue create | 282/s | 3.5ms |
+| Issue update | 269/s | 3.7ms |
+| Issue show (by ID) | 240 qps | 4.2ms |
+| Issue list (全部 5,752) | 7 qps | 151ms |
+| Blocking edge create | 274/s | 3.6ms |
+| Add comment | 272/s | 3.7ms |
+| Label create | 304/s | 3.3ms |
+| Mixed C+R+U+C pipeline | 265 ops/s | 15ms/pipe |
+| Large body (100KB) | — | 6ms |
+| Large body (1MB) | — | 13ms |
 
-磁盘占用:
-  5,600 issues ...............  1.3 MB      (~230 B/issue)
-  5,751 issues + blobs .......  1.7 MB
+### 并发吞吐量 (WAL, 并行进程)
 
-瓶颈: 进程启动 (6ms)，非 SQLite。MCP 持连接模式消除此开销。
-```
+| 工作数 | 场景 | 吞吐量 | 相比顺序 |
+|---|---|---|---|
+| 4 | Create | 747/s | 2.8× |
+| 16 | Create | 1,011/s | 3.8× |
+| 32 | Create | 1,019/s | 3.8× (饱和) |
+| 4 | Mixed R+W | 840/s | 3.1× |
+| 4 | Same-issue race | 746/s | 2.8× (零死锁) |
+| 8 | Query (list) | 62 qps | 2,600 issues |
+
+### 磁盘占用
+
+| 数据集 | 大小 | 单 issue |
+|---|---|---|
+| 2,600 issues (基础) | 232 KB | ~90 B |
+| 5,752 issues (含评论和边) | 3.6 MB | ~640 B |
+
+**瓶颈**: CLI 进程启动 (~6ms)，非 SQLite。MCP 持连接模式消除此开销，预期 3–5× 提升。
 
 ## 许可证
 

@@ -282,8 +282,8 @@ func TestListIssuesDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	issues, err := s.ListIssues("", "", "", nil, nil)
 
-	issues, err := s.ListIssues("", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func TestListIssuesFilterState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	openIssues, err := s.ListIssues("open", "", "", nil)
+	openIssues, err := s.ListIssues("open", "", "", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestListIssuesFilterState(t *testing.T) {
 		t.Fatalf("expected 1 open issue, got %d", len(openIssues))
 	}
 
-	closedIssues, err := s.ListIssues("closed", "", "", nil)
+	closedIssues, err := s.ListIssues("closed", "", "", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestListIssuesFilterKind(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	specs, err := s.ListIssues("", "spec", "", nil)
+	specs, err := s.ListIssues("", "spec", "", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestListIssuesFilterLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bugIssues, err := s.ListIssues("", "bug", "", nil)
+	bugIssues, err := s.ListIssues("", "bug", "", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +395,7 @@ func TestListIssuesFilterParentID(t *testing.T) {
 	}
 
 	pid1 := 1
-	children, err := s.ListIssues("", "", "", &pid1)
+	children, err := s.ListIssues("", "", "", &pid1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,12 +404,62 @@ func TestListIssuesFilterParentID(t *testing.T) {
 	}
 
 	pid0 := 0
-	topLevel, err := s.ListIssues("", "", "", &pid0)
+	topLevel, err := s.ListIssues("", "", "", &pid0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(topLevel) != 2 {
 		t.Fatalf("expected 2 top-level issues (#1 and #5), got %d", len(topLevel))
+	}
+}
+
+func TestListIssuesFilterIsBlocked(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	_, err := s.CreateIssue("Blocker", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.CreateIssue("Blocked", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.CreateIssue("Neither", "task", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	blockedTrue := true
+	blocked, err := s.ListIssues("", "", "", nil, &blockedTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocked) != 1 || blocked[0].Title != "Blocked" {
+		t.Fatalf("expected 1 blocked issue (Blocked), got %d: %v", len(blocked), blocked)
+	}
+
+	blockedFalse := false
+	unblocked, err := s.ListIssues("", "", "", nil, &blockedFalse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unblocked) != 2 {
+		t.Fatalf("expected 2 unblocked issues, got %d", len(unblocked))
+	}
+
+	if err := s.CloseIssue(1); err != nil {
+		t.Fatal(err)
+	}
+	blocked, err = s.ListIssues("", "", "", nil, &blockedTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocked) != 0 {
+		t.Fatalf("expected 0 blocked issues after blocker closed, got %d", len(blocked))
 	}
 }
 

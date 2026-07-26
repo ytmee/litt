@@ -115,40 +115,45 @@ Add to your agent's MCP configuration:
 `AGENTS.md` (use `--target CLAUDE.md` for Claude Code) that tells agents to
 use litt instead of Markdown files for issue tracking.
 
-## Performance
+## Benchmark
 
-```
-Environment:    SQLite (WAL mode), ext4, AMD64, 5,600 issues dataset
-CLI overhead:   ~6ms per invocation (process startup)
-MCP mode:       eliminates process overhead, expected 3-5x improvement
+Environment: SQLite (WAL), ext4, AMD64, 5,752 issues dataset
+CLI overhead: ~6ms per invocation (process startup)
 
-Sequential Throughput (single process):
-  Issue create  ..............  266/s       (1.9ms each)
-  Issue update  ..............  270/s       (3.7ms each)
-  Issue show (by ID) .........  278 qps     (3.6ms each)
-  Issue list (700 issues) ....   41 qps     (55ms each)
-  Issue list (5,600 issues) ..    6 qps     (147ms each)
-  Create edge (blocking) .....  267/s       (3.7ms each)
-  Add comment ................  258/s       (3.9ms each)
-  Create label ...............  235/s       (4.3ms each)
-  Mixed pipeline (C+R+U+C) ..  257 ops/s   (15ms per 4-op pipeline)
-  Large body (100KB) .........    9ms       (single issue)
-  Large body (1MB) ...........   20ms       (single issue)
+### Sequential (single process)
 
-Concurrent Throughput (parallel processes, WAL mode):
-  4 workers create ...........  769/s       (3.0x vs sequential)
-  16 workers create .......... 1,059/s      (4.1x)
-  32 workers create .......... 1,161/s      (4.5x, near saturation)
-  4 workers mixed R+W ........  806 ops/s   (3.1x)
-  4 workers same-issue race ..  735/s       (2.8x, zero deadlocks)
-  8 workers query ............  213 qps     (5.2x)
+| Operation | Throughput | Latency |
+|---|---|---|
+| Issue create | 282/s | 3.5ms |
+| Issue update | 269/s | 3.7ms |
+| Issue show (by ID) | 240 qps | 4.2ms |
+| Issue list (all 5,752) | 7 qps | 151ms |
+| Blocking edge create | 274/s | 3.6ms |
+| Add comment | 272/s | 3.7ms |
+| Label create | 304/s | 3.3ms |
+| Mixed C+R+U+C pipeline | 265 ops/s | 15ms/pipe |
+| Large body (100KB) | — | 6ms |
+| Large body (1MB) | — | 13ms |
 
-Disk Usage:
-  5,600 issues ...............  1.3 MB      (~230 B/issue)
-  5,751 issues + blobs .......  1.7 MB
+### Concurrent (WAL, parallel processes)
 
-Bottleneck: Process startup (6ms), not SQLite. MCP persistence removes it.
-```
+| Workers | Scenario | Throughput | vs sequential |
+|---|---|---|---|
+| 4 | Create | 747/s | 2.8× |
+| 16 | Create | 1,011/s | 3.8× |
+| 32 | Create | 1,019/s | 3.8× (saturated) |
+| 4 | Mixed R+W | 840/s | 3.1× |
+| 4 | Same-issue race | 746/s | 2.8× (zero deadlocks) |
+| 8 | Query (list) | 62 qps | 2,600 issues |
+
+### Disk
+
+| Dataset | Size | Per issue |
+|---|---|---|
+| 2,600 issues (base) | 232 KB | ~90 B |
+| 5,752 issues (comments+edges) | 3.6 MB | ~640 B |
+
+**Bottleneck**: CLI process startup (~6ms), not SQLite. MCP long‑lived connection eliminates it, projecting 3–5× improvement.
 
 ## License
 

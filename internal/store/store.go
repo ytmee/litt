@@ -236,10 +236,6 @@ func (s *Store) ListLabels() ([]Label, error) {
 	return labels, rows.Err()
 }
 
-func (s *Store) DB() *sql.DB {
-	return s.writeDB
-}
-
 type retryConfig struct {
 	maxAttempts int
 	baseDelay   time.Duration
@@ -501,10 +497,15 @@ func (s *Store) GetIssue(id int) (*Issue, error) {
 	return &issue, nil
 }
 
-func (s *Store) ListIssues(state, kind, label string, parentID *int) ([]Issue, error) {
+func (s *Store) ListIssues(state, kind, label string, parentID *int, isBlocked *bool) ([]Issue, error) {
 	query := `SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at FROM issues i`
 	var args []interface{}
 	var conditions []string
+
+	if isBlocked != nil {
+		query += ` LEFT JOIN issue_blocks ib ON i.id = ib.blocked_issue_id`
+		query += ` LEFT JOIN issues blocker ON ib.blocker_issue_id = blocker.id AND blocker.state = 'open'`
+	}
 
 	if label != "" {
 		query += ` JOIN issue_labels il ON i.id = il.issue_id JOIN labels l ON il.label_id = l.id`
@@ -529,6 +530,14 @@ func (s *Store) ListIssues(state, kind, label string, parentID *int) ([]Issue, e
 	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	if isBlocked != nil {
+		query += " GROUP BY i.id"
+		if *isBlocked {
+			query += " HAVING COUNT(blocker.id) > 0"
+		} else {
+			query += " HAVING COUNT(blocker.id) = 0"
+		}
 	}
 	query += " ORDER BY i.id"
 
@@ -704,7 +713,7 @@ func (s *Store) ClearParent(id int) error {
 }
 
 func (s *Store) ListChildren(parentID int) ([]Issue, error) {
-	return s.ListIssues("", "", "", &parentID)
+	return s.ListIssues("", "", "", &parentID, nil)
 }
 
 func (s *Store) CreateBlock(blockerID, blockedID int) (created bool, err error) {

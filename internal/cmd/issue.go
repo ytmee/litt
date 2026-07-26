@@ -130,7 +130,7 @@ func newIssueListCmd() *cobra.Command {
 			if cmd.Flags().Changed("parent-id") {
 				pid = &parentID
 			}
-			issues, err := s.ListIssues(filterState, kind, label, pid)
+			issues, err := s.ListIssues(filterState, kind, label, pid, nil)
 			if err != nil {
 				return fmt.Errorf("list issues: %w", err)
 			}

@@ -7,7 +7,7 @@ import (
 )
 
 type issueReader interface {
-	ListIssues(state, kind, label string, parentID *int) ([]store.Issue, error)
+	ListIssues(state, kind, label string, parentID *int, isBlocked *bool) ([]store.Issue, error)
 	ListBlockedBy(issueID int) ([]store.Issue, error)
 	ListBlocking(issueID int) ([]store.Issue, error)
 }
@@ -40,14 +40,7 @@ func ListIssues(reader issueReader, params Params) ([]store.Issue, error) {
 		return filterPost(issues, params), nil
 	}
 
-	issues, err := reader.ListIssues(params.State, params.Kind, params.Label, params.ParentID)
-	if err != nil {
-		return nil, err
-	}
-	if params.IsBlocked != nil {
-		return filterBlocked(reader, issues, *params.IsBlocked)
-	}
-	return issues, nil
+	return reader.ListIssues(params.State, params.Kind, params.Label, params.ParentID, params.IsBlocked)
 }
 
 func ListReady(reader issueReader, parentID ...int) ([]store.Issue, error) {
@@ -55,11 +48,8 @@ func ListReady(reader issueReader, parentID ...int) ([]store.Issue, error) {
 	if len(parentID) > 0 {
 		pid = &parentID[0]
 	}
-	issues, err := reader.ListIssues("open", "", "ready-for-agent", pid)
-	if err != nil {
-		return nil, err
-	}
-	return filterBlocked(reader, issues, false)
+	isBlocked := false
+	return reader.ListIssues("open", "", "ready-for-agent", pid, &isBlocked)
 }
 
 func filterPost(issues []store.Issue, params Params) []store.Issue {
@@ -90,27 +80,6 @@ func filterPost(issues []store.Issue, params Params) []store.Issue {
 		filtered = append(filtered, issue)
 	}
 	return filtered
-}
-
-func filterBlocked(reader issueReader, issues []store.Issue, wantBlocked bool) ([]store.Issue, error) {
-	filtered := make([]store.Issue, 0)
-	for _, issue := range issues {
-		blockers, err := reader.ListBlockedBy(issue.ID)
-		if err != nil {
-			return nil, err
-		}
-		hasOpenBlocker := false
-		for _, b := range blockers {
-			if b.State == "open" {
-				hasOpenBlocker = true
-				break
-			}
-		}
-		if wantBlocked == hasOpenBlocker {
-			filtered = append(filtered, issue)
-		}
-	}
-	return filtered, nil
 }
 
 func hasLabel(issue store.Issue, name string) bool {
