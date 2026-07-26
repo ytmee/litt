@@ -115,6 +115,41 @@ litt issue block 2 1
 （用 `--target CLAUDE.md` 指定 Claude Code），告知 agent 使用 litt
 而非 Markdown 文件来管理 issue。
 
+## 性能
+
+```
+环境:          SQLite (WAL 模式), ext4, AMD64, 5,600 issues 数据集
+CLI 开销:      ~6ms/调用 (进程启动)
+MCP 模式:      消除进程开销，预期 3-5x 提升
+
+顺序吞吐量 (单进程):
+  Issue create  ..............  266/s       (1.9ms each)
+  Issue update  ..............  270/s       (3.7ms each)
+  Issue show (by ID) .........  278 qps     (3.6ms each)
+  Issue list (700 issues) ....   41 qps     (55ms each)
+  Issue list (5,600 issues) ..    6 qps     (147ms each)
+  Create edge (blocking) .....  267/s       (3.7ms each)
+  Add comment ................  258/s       (3.9ms each)
+  Create label ...............  235/s       (4.3ms each)
+  Mixed pipeline (C+R+U+C) ..  257 ops/s   (15ms per 4-op pipeline)
+  Large body (100KB) .........    9ms       (single issue)
+  Large body (1MB) ...........   20ms       (single issue)
+
+并发吞吐量 (并行进程, WAL 模式):
+  4 workers create ...........  769/s       (3.0x vs sequential)
+  16 workers create .......... 1,059/s      (4.1x)
+  32 workers create .......... 1,161/s      (4.5x, 接近饱和)
+  4 workers mixed R+W ........  806 ops/s   (3.1x)
+  4 workers same-issue race ..  735/s       (2.8x, 零死锁)
+  8 workers query ............  213 qps     (5.2x)
+
+磁盘占用:
+  5,600 issues ...............  1.3 MB      (~230 B/issue)
+  5,751 issues + blobs .......  1.7 MB
+
+瓶颈: 进程启动 (6ms)，非 SQLite。MCP 持连接模式消除此开销。
+```
+
 ## 许可证
 
 MIT

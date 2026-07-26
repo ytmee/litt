@@ -17,7 +17,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	var count int
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
+	if err := s.writeDB.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 3 {
@@ -40,7 +40,7 @@ func TestMigrateIdempotent(t *testing.T) {
 	}
 
 	var count int
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
+	if err := s.writeDB.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 3 {
@@ -1068,7 +1068,7 @@ func TestTablesCreated(t *testing.T) {
 	expectedTables := []string{"issues", "labels", "issue_labels", "issue_blocks", "comments", "schema_migrations"}
 	for _, name := range expectedTables {
 		var count int
-		err := s.db.QueryRow(
+		err := s.writeDB.QueryRow(
 			"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
 			name,
 		).Scan(&count)

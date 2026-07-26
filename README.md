@@ -115,6 +115,41 @@ Add to your agent's MCP configuration:
 `AGENTS.md` (use `--target CLAUDE.md` for Claude Code) that tells agents to
 use litt instead of Markdown files for issue tracking.
 
+## Performance
+
+```
+Environment:    SQLite (WAL mode), ext4, AMD64, 5,600 issues dataset
+CLI overhead:   ~6ms per invocation (process startup)
+MCP mode:       eliminates process overhead, expected 3-5x improvement
+
+Sequential Throughput (single process):
+  Issue create  ..............  266/s       (1.9ms each)
+  Issue update  ..............  270/s       (3.7ms each)
+  Issue show (by ID) .........  278 qps     (3.6ms each)
+  Issue list (700 issues) ....   41 qps     (55ms each)
+  Issue list (5,600 issues) ..    6 qps     (147ms each)
+  Create edge (blocking) .....  267/s       (3.7ms each)
+  Add comment ................  258/s       (3.9ms each)
+  Create label ...............  235/s       (4.3ms each)
+  Mixed pipeline (C+R+U+C) ..  257 ops/s   (15ms per 4-op pipeline)
+  Large body (100KB) .........    9ms       (single issue)
+  Large body (1MB) ...........   20ms       (single issue)
+
+Concurrent Throughput (parallel processes, WAL mode):
+  4 workers create ...........  769/s       (3.0x vs sequential)
+  16 workers create .......... 1,059/s      (4.1x)
+  32 workers create .......... 1,161/s      (4.5x, near saturation)
+  4 workers mixed R+W ........  806 ops/s   (3.1x)
+  4 workers same-issue race ..  735/s       (2.8x, zero deadlocks)
+  8 workers query ............  213 qps     (5.2x)
+
+Disk Usage:
+  5,600 issues ...............  1.3 MB      (~230 B/issue)
+  5,751 issues + blobs .......  1.7 MB
+
+Bottleneck: Process startup (6ms), not SQLite. MCP persistence removes it.
+```
+
 ## License
 
 MIT

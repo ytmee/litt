@@ -17,7 +17,7 @@ func TestEnsure_CreatesAndMigrates(t *testing.T) {
 	defer s.Close()
 
 	var count int
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
+	if err := s.writeDB.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 3 {
@@ -50,7 +50,7 @@ func TestEnsure_Idempotent(t *testing.T) {
 	defer s2.Close()
 
 	var count int
-	if err := s2.db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
+	if err := s2.writeDB.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 3 {
