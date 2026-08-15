@@ -22,8 +22,10 @@ type commentView struct {
 
 // edgeList carries a sidebar blocking-edge list and its empty-state message.
 type edgeList struct {
-	Items []store.Issue
-	Empty string
+	Items        []store.Issue
+	Empty        string
+	RemoveAction string
+	CSRF         string
 }
 
 type detailPageData struct {
@@ -35,6 +37,7 @@ type detailPageData struct {
 	BlockedBy     edgeList
 	Blocking      edgeList
 	AddableLabels []store.Label
+	Error         string
 }
 
 func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +45,13 @@ func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	h.renderDetail(w, r, id, "")
+}
+
+// renderDetail loads the detail-page data and renders it. It is shared by the
+// GET handler and the edge write handlers so a rejected write surfaces its
+// reason on the same page.
+func (h *Handler) renderDetail(w http.ResponseWriter, r *http.Request, id int, errMsg string) {
 	issue, err := h.store.GetIssue(id)
 	if err != nil {
 		h.writeIssueError(w, r, err)
@@ -83,9 +93,10 @@ func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
 		Issue:         *issue,
 		BodyHTML:      renderMarkdown(issue.Body),
 		Comments:      commentViews,
-		BlockedBy:     edgeList{Items: blockedBy, Empty: "Nothing blocks this issue."},
-		Blocking:      edgeList{Items: blocking, Empty: "Blocks nothing."},
+		BlockedBy:     edgeList{Items: blockedBy, Empty: "Nothing blocks this issue.", RemoveAction: fmt.Sprintf("/issues/%d/blocked-by/remove", id), CSRF: h.csrf},
+		Blocking:      edgeList{Items: blocking, Empty: "Blocks nothing.", RemoveAction: fmt.Sprintf("/issues/%d/blocking/remove", id), CSRF: h.csrf},
 		AddableLabels: addableLabels(allLabels, issue.Labels),
+		Error:         errMsg,
 	}
 
 	var buf bytes.Buffer
@@ -94,7 +105,130 @@ func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if errMsg != "" {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	}
 	_, _ = w.Write(buf.Bytes())
+}
+
+// addBlocking records "this issue blocks target", then redirects back.
+func (h *Handler) addBlocking(w http.ResponseWriter, r *http.Request) {
+	h.addEdge(w, r, true)
+}
+
+// addBlockedBy records "target blocks this issue", then redirects back.
+func (h *Handler) addBlockedBy(w http.ResponseWriter, r *http.Request) {
+	h.addEdge(w, r, false)
+}
+
+// removeBlocking deletes "this issue blocks target", then redirects back.
+func (h *Handler) removeBlocking(w http.ResponseWriter, r *http.Request) {
+	h.removeEdge(w, r, true)
+}
+
+// removeBlockedBy deletes "target blocks this issue", then redirects back.
+func (h *Handler) removeBlockedBy(w http.ResponseWriter, r *http.Request) {
+	h.removeEdge(w, r, false)
+}
+
+// addEdge adds a blocking edge between the current issue and target. With
+// forward=true the current issue blocks target; otherwise target blocks it.
+func (h *Handler) addEdge(w http.ResponseWriter, r *http.Request, forward bool) {
+	id, ok := h.requireIssue(w, r)
+	if !ok {
+		return
+	}
+	if !h.checkCSRF(r) {
+		http.Error(w, "invalid csrf token", http.StatusForbidden)
+		return
+	}
+	target, msg, err := h.parseEdgeTarget(w, r)
+	if err != nil {
+		h.serverError(w, err)
+		return
+	}
+	if msg != "" {
+		h.renderDetail(w, r, id, msg)
+		return
+	}
+	if target == id {
+		h.renderDetail(w, r, id, "An issue cannot block or be blocked by itself.")
+		return
+	}
+	blocker, blocked := id, target
+	if !forward {
+		blocker, blocked = target, id
+	}
+	created, err := h.store.CreateBlock(blocker, blocked)
+	if err != nil {
+		if errors.Is(err, store.ErrBlockCycle) {
+			h.renderDetail(w, r, id, "Adding this edge would create a cycle.")
+			return
+		}
+		h.serverError(w, err)
+		return
+	}
+	if !created {
+		if forward {
+			msg = fmt.Sprintf("Issue already blocks #%d.", target)
+		} else {
+			msg = fmt.Sprintf("Issue already blocked by #%d.", target)
+		}
+		h.renderDetail(w, r, id, msg)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/issues/%d", id), http.StatusSeeOther)
+}
+
+// removeEdge removes the blocking edge between the current issue and target.
+// With forward=true the current issue blocks target; otherwise target blocks it.
+func (h *Handler) removeEdge(w http.ResponseWriter, r *http.Request, forward bool) {
+	id, ok := h.requireIssue(w, r)
+	if !ok {
+		return
+	}
+	if !h.checkCSRF(r) {
+		http.Error(w, "invalid csrf token", http.StatusForbidden)
+		return
+	}
+	target, msg, err := h.parseEdgeTarget(w, r)
+	if err != nil {
+		h.serverError(w, err)
+		return
+	}
+	if msg != "" {
+		h.renderDetail(w, r, id, msg)
+		return
+	}
+	blocker, blocked := id, target
+	if !forward {
+		blocker, blocked = target, id
+	}
+	if err := h.store.RemoveBlock(blocker, blocked); err != nil {
+		if errors.Is(err, store.ErrBlockNotFound) {
+			h.renderDetail(w, r, id, "Block edge not found.")
+			return
+		}
+		h.serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/issues/%d", id), http.StatusSeeOther)
+}
+
+// parseEdgeTarget parses and verifies the target issue for an edge write,
+// returning an error message when the target is unusable.
+func (h *Handler) parseEdgeTarget(w http.ResponseWriter, r *http.Request) (int, string, error) {
+	target, err := strconv.Atoi(r.FormValue("target"))
+	if err != nil || target < 1 {
+		return 0, "Target must be a positive issue number.", nil
+	}
+	if _, err := h.store.GetIssue(target); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return 0, fmt.Sprintf("Issue #%d not found.", target), nil
+		}
+		return 0, "", err
+	}
+	return target, "", nil
 }
 
 // setState closes or reopens an issue via a form POST, then redirects back.

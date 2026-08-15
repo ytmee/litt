@@ -2,6 +2,19 @@
   margin-bottom: 1rem;
 }
 
+.litt-new {
+  width: auto;
+  margin-top: 0.5rem;
+}
+
+.form-error {
+  color: #cf222e;
+  border: 1px solid #cf222e;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
 .litt-tabs {
   display: flex;
   gap: 0.25rem;
@@ -158,6 +171,12 @@ a.issue-title:hover {
   gap: 0.35rem;
 }
 
+.edge-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .edge-list a {
   text-decoration: none;
   color: inherit;
@@ -166,6 +185,37 @@ a.issue-title:hover {
 .edge-list a:hover {
   color: var(--pico-primary, #1863c8);
   text-decoration: underline;
+}
+
+.edge-remove {
+  margin: 0;
+  margin-left: auto;
+}
+
+.edge-remove .edge-remove-btn {
+  padding: 0 0.3rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  border-radius: 50%;
+  width: auto;
+  margin: 0;
+}
+
+.edge-add {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+}
+
+.edge-add input,
+.edge-add button {
+  width: auto;
+  margin: 0;
+}
+
+.edge-add input[type="number"] {
+  width: 5rem;
 }
 
 .edge-closed a {

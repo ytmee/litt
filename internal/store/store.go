@@ -33,6 +33,14 @@ type Label struct {
 // callers can distinguish missing entities from store failures.
 var ErrNotFound = errors.New("not found")
 
+// ErrBlockNotFound wraps errors returned when a blocking edge to remove does
+// not exist, so callers can distinguish clean rejections from store failures.
+var ErrBlockNotFound = errors.New("block edge not found")
+
+// ErrBlockCycle wraps errors returned when adding a blocking edge would create
+// a cycle, so callers can reject it cleanly.
+var ErrBlockCycle = errors.New("blocking this issue would create a cycle")
+
 var seedLabels = []Label{
 	{Name: "needs-triage", Color: "e4e669", Description: "Maintainer needs to evaluate this issue", Kind: "triage"},
 	{Name: "needs-info", Color: "fef2c0", Description: "Waiting on reporter for more information", Kind: "triage"},
@@ -754,7 +762,7 @@ func (s *Store) CreateBlock(blockerID, blockedID int) (created bool, err error) 
 			return err
 		}
 		if cycle {
-			return fmt.Errorf("blocking this issue would create a cycle")
+			return fmt.Errorf("blocking this issue would create a cycle: %w", ErrBlockCycle)
 		}
 
 		result, execErr := s.writeDB.Exec(
@@ -782,7 +790,7 @@ func (s *Store) RemoveBlock(blockerID, blockedID int) error {
 		}
 		n, _ := result.RowsAffected()
 		if n == 0 {
-			return fmt.Errorf("block edge not found")
+			return fmt.Errorf("remove block: %w", ErrBlockNotFound)
 		}
 		return nil
 	})

@@ -99,14 +99,26 @@
       </section>
 
       <aside class="detail-sidebar">
+        {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
         <section>
           <h4>Blocked by</h4>
           {{template "edge-list" .BlockedBy}}
+          <form method="post" action="/issues/{{.Issue.ID}}/blocked-by" class="edge-add">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <input type="number" name="target" placeholder="Issue #" min="1" required aria-label="Blocker issue number">
+            <button type="submit" class="secondary">Add blocker</button>
+          </form>
         </section>
 
         <section>
           <h4>Blocks</h4>
           {{template "edge-list" .Blocking}}
+          <form method="post" action="/issues/{{.Issue.ID}}/blocking" class="edge-add">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <input type="number" name="target" placeholder="Issue #" min="1" required aria-label="Blocked issue number">
+            <button type="submit" class="secondary">Add blocked</button>
+          </form>
         </section>
       </aside>
     </div>
@@ -121,6 +133,11 @@
   <li class="{{if eq .State "closed"}}edge-closed{{end}}">
     <a href="/issues/{{.ID}}">#{{.ID}} {{.Title}}</a>
     {{if eq .State "closed"}}<span class="issue-state issue-state-closed">closed</span>{{end}}
+    <form method="post" action="{{$.RemoveAction}}" class="edge-remove">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <input type="hidden" name="target" value="{{.ID}}">
+      <button type="submit" class="edge-remove-btn" aria-label="Remove edge with #{{.ID}}" title="Remove edge with #{{.ID}}">×</button>
+    </form>
   </li>
   {{end}}
 </ul>

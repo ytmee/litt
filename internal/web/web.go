@@ -46,10 +46,16 @@ func NewHandler(st *store.Store, opts Options) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", h.list)
+	mux.HandleFunc("GET /issue/new", h.newForm)
+	mux.HandleFunc("POST /issue/new", h.createIssue)
 	mux.HandleFunc("GET /issues/{id}", h.detail)
 	mux.HandleFunc("POST /issues/{id}/state", h.setState)
 	mux.HandleFunc("POST /issues/{id}/labels", h.setLabels)
 	mux.HandleFunc("POST /issues/{id}/comments", h.addComment)
+	mux.HandleFunc("POST /issues/{id}/blocking", h.addBlocking)
+	mux.HandleFunc("POST /issues/{id}/blocked-by", h.addBlockedBy)
+	mux.HandleFunc("POST /issues/{id}/blocking/remove", h.removeBlocking)
+	mux.HandleFunc("POST /issues/{id}/blocked-by/remove", h.removeBlockedBy)
 	mux.HandleFunc("GET /static/", h.static)
 
 	var handler http.Handler = mux

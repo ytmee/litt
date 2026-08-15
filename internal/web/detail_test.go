@@ -13,18 +13,7 @@ import (
 // can replay it in their POST bodies.
 func csrfToken(t *testing.T, ts *httptest.Server, issueID int) string {
 	t.Helper()
-	page := body(t, get(t, ts, fmt.Sprintf("/issues/%d", issueID)))
-	const marker = `name="csrf" value="`
-	start := strings.Index(page, marker)
-	if start == -1 {
-		t.Fatal("csrf hidden field missing from detail page")
-	}
-	start += len(marker)
-	end := strings.Index(page[start:], `"`)
-	if end == -1 {
-		t.Fatal("unterminated csrf value")
-	}
-	return page[start : start+end]
+	return csrfFromPage(t, ts, fmt.Sprintf("/issues/%d", issueID))
 }
 
 // post sends a form POST without following redirects, so tests can assert the

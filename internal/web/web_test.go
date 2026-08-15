@@ -58,6 +58,24 @@ func seedFixtures(t *testing.T, s *store.Store) {
 	}
 }
 
+// csrfFromPage reads the synchronizer token hidden field from any rendered
+// page so write tests can replay it in their POST bodies.
+func csrfFromPage(t *testing.T, ts *httptest.Server, path string) string {
+	t.Helper()
+	page := body(t, get(t, ts, path))
+	const marker = `name="csrf" value="`
+	start := strings.Index(page, marker)
+	if start == -1 {
+		t.Fatalf("csrf hidden field missing from %s", path)
+	}
+	start += len(marker)
+	end := strings.Index(page[start:], `"`)
+	if end == -1 {
+		t.Fatal("unterminated csrf value")
+	}
+	return page[start : start+end]
+}
+
 func get(t *testing.T, ts *httptest.Server, path string) *http.Response {
 	t.Helper()
 	resp, err := ts.Client().Get(ts.URL + path)
