@@ -18,4 +18,5 @@ Status: accepted
 ## Consequences
 
 - Body/comments render Markdown via goldmark, sanitized by bluemonday, injected as `template.HTML` — the sanitizer is load-bearing and must not be removed.
-- Default listener is `127.0.0.1:57664` (fixed port, WSL2 localhost forwarding reaches it from the host browser; bind conflict errors out rather than silently drifting). Non-loopback binds require host-guard allowlist / env opt-in.
+- Default listener is `127.0.0.1:57664`; WSL2 localhost forwarding reaches it from the host browser. Non-loopback binds require host-guard allowlist / env opt-in.
+  - **Revised 2026-08-15:** the default port is a *preferred* port, not a guarantee. When several litt projects serve on one machine, a busy default bumps to the next free port (up to 10 attempts) and the actual URL is printed; a bumped bind prints a busy notice. An explicit `--addr` binds strictly and fails if taken — deliberate binds keep the original fail-loud behavior.

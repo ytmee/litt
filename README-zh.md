@@ -74,7 +74,7 @@ litt issue block 2 1
 | `litt issue block/unblock` | 管理阻塞关系 |
 | `litt label list` | 列出标签（`--json`） |
 | `litt mcp` | 启动 MCP stdio 服务 |
-| `litt web` | 在 `127.0.0.1:57664` 启动 WebUI（`--addr` 可覆盖） |
+| `litt web` | 在 `127.0.0.1:57664` 启动 WebUI，被占时自动顺延到下一空闲端口（`--addr` 严格绑定） |
 | `litt agent install` | 向 AGENTS.md 注入 agent 指令 |
 
 ## AI agent 集成

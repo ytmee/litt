@@ -74,7 +74,7 @@ litt issue block 2 1
 | `litt issue block/unblock` | Manage blocking edges |
 | `litt label list` | List labels (`--json`) |
 | `litt mcp` | Start MCP stdio server |
-| `litt web` | Start the WebUI on `127.0.0.1:57664` (`--addr` to override) |
+| `litt web` | Start the WebUI on `127.0.0.1:57664`, bumping to the next free port if busy (`--addr` binds strictly) |
 | `litt agent install` | Inject agent instructions into AGENTS.md |
 
 ## AI agent integration
