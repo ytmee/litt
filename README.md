@@ -15,6 +15,7 @@ A local-first task graph and execution tracker for AI agents.
 - **Derived ready query** — open + triaged + unblocked issues, computed on demand
 - **CLI** — create, list, show, update, close, parent, block, ready
 - **MCP stdio server** — agents interact through typed tools, not freeform text
+- **WebUI** — a browser interface for scanning the board and light triage (`litt web`)
 - **Agent auto-install** — `litt agent install` injects managed instructions into AGENTS.md
 
 ## Installation
@@ -73,6 +74,7 @@ litt issue block 2 1
 | `litt issue block/unblock` | Manage blocking edges |
 | `litt label list` | List labels (`--json`) |
 | `litt mcp` | Start MCP stdio server |
+| `litt web` | Start the WebUI on `127.0.0.1:57664` (`--addr` to override) |
 | `litt agent install` | Inject agent instructions into AGENTS.md |
 
 ## AI agent integration

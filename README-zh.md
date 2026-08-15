@@ -15,6 +15,7 @@ AI agent 的本地优先任务图与执行追踪器。
 - **派生 ready 查询** — open + 已分类 + 未阻塞，按需计算
 - **CLI** — create, list, show, update, close, parent, block, ready
 - **MCP stdio 服务** — agent 通过类型化工具交互，而非自由文本
+- **WebUI** — 浏览器界面，用于扫描任务板和轻量三审（`litt web`）
 - **Agent 自动安装** — `litt agent install` 向 AGENTS.md 注入托管指令
 
 ## 安装
@@ -73,6 +74,7 @@ litt issue block 2 1
 | `litt issue block/unblock` | 管理阻塞关系 |
 | `litt label list` | 列出标签（`--json`） |
 | `litt mcp` | 启动 MCP stdio 服务 |
+| `litt web` | 在 `127.0.0.1:57664` 启动 WebUI（`--addr` 可覆盖） |
 | `litt agent install` | 向 AGENTS.md 注入 agent 指令 |
 
 ## AI agent 集成
