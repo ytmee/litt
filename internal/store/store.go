@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -27,6 +28,10 @@ type Label struct {
 	Description string `json:"description"`
 	Kind        string `json:"kind"`
 }
+
+// ErrNotFound wraps errors returned when a requested row does not exist, so
+// callers can distinguish missing entities from store failures.
+var ErrNotFound = errors.New("not found")
 
 var seedLabels = []Label{
 	{Name: "needs-triage", Color: "e4e669", Description: "Maintainer needs to evaluate this issue", Kind: "triage"},
@@ -484,7 +489,7 @@ func (s *Store) GetIssue(id int) (*Issue, error) {
 	var issue Issue
 	err := row.Scan(&issue.ID, &issue.Title, &issue.Body, &issue.State, &issue.Kind, &issue.ParentIssueID, &issue.CreatedAt, &issue.UpdatedAt, &issue.ClosedAt)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("issue %d not found", id)
+		return nil, fmt.Errorf("issue %d: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get issue %d: %w", id, err)

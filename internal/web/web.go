@@ -32,6 +32,7 @@ type Options struct {
 type Handler struct {
 	store *store.Store
 	tmpl  *template.Template
+	csrf  string
 }
 
 // NewHandler returns the WebUI HTTP handler with the host guard and security
@@ -40,10 +41,15 @@ func NewHandler(st *store.Store, opts Options) http.Handler {
 	h := &Handler{
 		store: st,
 		tmpl:  template.Must(template.ParseFS(content, "templates/*.html")),
+		csrf:  newCSRFToken(),
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", h.list)
+	mux.HandleFunc("GET /issues/{id}", h.detail)
+	mux.HandleFunc("POST /issues/{id}/state", h.setState)
+	mux.HandleFunc("POST /issues/{id}/labels", h.setLabels)
+	mux.HandleFunc("POST /issues/{id}/comments", h.addComment)
 	mux.HandleFunc("GET /static/", h.static)
 
 	var handler http.Handler = mux

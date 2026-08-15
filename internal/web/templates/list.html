@@ -44,7 +44,7 @@
       {{range .Rows}}
       <li class="issue-row">
         <span class="issue-ref">#{{.ID}}</span>
-        <span class="issue-title">{{.Title}}</span>
+        <a class="issue-title" href="/issues/{{.ID}}">{{.Title}}</a>
         {{if eq .State "closed"}}<span class="issue-state issue-state-closed">closed</span>{{end}}
         <span class="issue-kind">{{.Kind}}</span>
         {{range .Labels}}<span class="label-pill" style="--label-color:#{{.Color}}">{{.Name}}</span>{{end}}

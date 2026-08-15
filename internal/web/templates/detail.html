@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/pico.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container">
+    <header class="litt-header">
+      <hgroup>
+        <h1><a href="/">litt</a></h1>
+        <p>Local-first task graph and execution tracker</p>
+      </hgroup>
+    </header>
+
+    <nav class="litt-tabs">
+      <a href="/?view=open">Open</a>
+      <a href="/?view=ready">Ready</a>
+      <a href="/?view=blocked">Blocked</a>
+      <a href="/?view=all">All</a>
+    </nav>
+
+    <div class="detail-grid">
+      <section>
+        <header class="issue-header">
+          <hgroup>
+            <h2>
+              <span class="issue-ref">#{{.Issue.ID}}</span>
+              {{.Issue.Title}}
+            </h2>
+            <p>
+              <span class="issue-kind">{{.Issue.Kind}}</span>
+              {{if eq .Issue.State "closed"}}<span class="issue-state issue-state-closed">closed</span>{{else}}<span class="issue-state issue-state-open">open</span>{{end}}
+              {{range .Issue.Labels}}<span class="label-pill" style="--label-color:#{{.Color}}">{{.Name}}</span>{{end}}
+            </p>
+          </hgroup>
+        </header>
+
+        <div class="issue-actions">
+          {{if eq .Issue.State "open"}}
+          <form method="post" action="/issues/{{.Issue.ID}}/state">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <input type="hidden" name="state" value="closed">
+            <button type="submit" class="secondary">Close issue</button>
+          </form>
+          {{else}}
+          <form method="post" action="/issues/{{.Issue.ID}}/state">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <input type="hidden" name="state" value="open">
+            <button type="submit">Reopen issue</button>
+          </form>
+          {{end}}
+
+          {{range .Issue.Labels}}
+          <form method="post" action="/issues/{{$.Issue.ID}}/labels" class="label-remove">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            <input type="hidden" name="remove" value="{{.Name}}">
+            <span class="label-pill" style="--label-color:#{{.Color}}">{{.Name}}</span>
+            <button type="submit" class="label-remove-btn" aria-label="Remove label {{.Name}}" title="Remove label {{.Name}}">×</button>
+          </form>
+          {{end}}
+
+          {{if .AddableLabels}}
+          <form method="post" action="/issues/{{.Issue.ID}}/labels" class="litt-addlabel">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <select name="add" aria-label="Add label">
+              {{range .AddableLabels}}
+              <option value="{{.Name}}">{{.Name}}</option>
+              {{end}}
+            </select>
+            <button type="submit">Add label</button>
+          </form>
+          {{end}}
+        </div>
+
+        <article class="markdown-body">
+          {{.BodyHTML}}
+        </article>
+
+        <section class="comment-list">
+          <h3>Comments</h3>
+          {{range .Comments}}
+          <article class="comment">
+            <div class="comment-meta">#{{.ID}} · {{.CreatedAt}}</div>
+            <div class="markdown-body">{{.BodyHTML}}</div>
+          </article>
+          {{else}}
+          <p class="edge-empty">No comments yet.</p>
+          {{end}}
+          <form method="post" action="/issues/{{.Issue.ID}}/comments" class="comment-form">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <textarea name="body" rows="4" required placeholder="Leave a comment"></textarea>
+            <button type="submit">Comment</button>
+          </form>
+        </section>
+      </section>
+
+      <aside class="detail-sidebar">
+        <section>
+          <h4>Blocked by</h4>
+          {{template "edge-list" .BlockedBy}}
+        </section>
+
+        <section>
+          <h4>Blocks</h4>
+          {{template "edge-list" .Blocking}}
+        </section>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>
+
+{{define "edge-list"}}
+{{if .Items}}
+<ul class="edge-list">
+  {{range .Items}}
+  <li class="{{if eq .State "closed"}}edge-closed{{end}}">
+    <a href="/issues/{{.ID}}">#{{.ID}} {{.Title}}</a>
+    {{if eq .State "closed"}}<span class="issue-state issue-state-closed">closed</span>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="edge-empty">{{.Empty}}</p>
+{{end}}
+{{end}}
