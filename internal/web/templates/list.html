@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/pico.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container">
+    <header class="litt-header">
+      <hgroup>
+        <h1>litt</h1>
+        <p>Local-first task graph and execution tracker</p>
+      </hgroup>
+    </header>
+
+    <nav class="litt-tabs">
+      {{range .Tabs}}
+        <a href="/?view={{.Name}}{{if $.Kind}}&amp;kind={{$.Kind}}{{end}}{{if $.Label}}&amp;label={{$.Label}}{{end}}"
+           {{if .Active}}aria-current="page"{{end}}>{{.Title}}</a>
+      {{end}}
+    </nav>
+
+    <form class="litt-filters" method="get" action="/">
+      <input type="hidden" name="view" value="{{.View}}">
+      <select name="kind" aria-label="Filter by kind">
+        <option value="">All kinds</option>
+        <option value="spec"{{if eq .Kind "spec"}} selected{{end}}>spec</option>
+        <option value="task"{{if eq .Kind "task"}} selected{{end}}>task</option>
+        <option value="bug"{{if eq .Kind "bug"}} selected{{end}}>bug</option>
+      </select>
+      <select name="label" aria-label="Filter by label">
+        <option value="">All labels</option>
+        {{range .Labels}}
+        <option value="{{.Name}}"{{if eq $.Label .Name}} selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+      <button type="submit">Filter</button>
+    </form>
+
+    <ul class="issue-list">
+      {{range .Rows}}
+      <li class="issue-row">
+        <span class="issue-ref">#{{.ID}}</span>
+        <span class="issue-title">{{.Title}}</span>
+        {{if eq .State "closed"}}<span class="issue-state issue-state-closed">closed</span>{{end}}
+        <span class="issue-kind">{{.Kind}}</span>
+        {{range .Labels}}<span class="label-pill" style="--label-color:#{{.Color}}">{{.Name}}</span>{{end}}
+        {{if .Blocked}}<span class="blocked-badge" title="Blocked by an open issue">blocked</span>{{end}}
+      </li>
+      {{else}}
+      <li class="issue-row issue-empty">No issues found</li>
+      {{end}}
+    </ul>
+  </main>
+</body>
+</html>

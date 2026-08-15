@@ -1,0 +1,110 @@
+.litt-header {
+  margin-bottom: 1rem;
+}
+
+.litt-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--pico-muted-border-color, #d9d9d9);
+}
+
+.litt-tabs a {
+  padding: 0.4rem 0.9rem;
+  text-decoration: none;
+  border-radius: 6px 6px 0 0;
+  color: var(--pico-muted-color, #646b79);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.litt-tabs a:hover {
+  background: var(--pico-primary-focus, #e6f0fd);
+}
+
+.litt-tabs a[aria-current="page"] {
+  color: var(--pico-primary, #1863c8);
+  font-weight: 600;
+  border-bottom-color: var(--pico-primary, #1863c8);
+}
+
+.litt-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.litt-filters select,
+.litt-filters button {
+  width: auto;
+  margin: 0;
+}
+
+.issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.issue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--pico-muted-border-color, #d9d9d9);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  padding: 0.6rem 0.8rem;
+}
+
+.issue-row:hover {
+  background: var(--pico-primary-focus, #e6f0fd);
+}
+
+.issue-ref {
+  color: var(--pico-muted-color, #646b79);
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-title {
+  font-weight: 500;
+}
+
+.issue-kind {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color, #646b79);
+  border: 1px solid var(--pico-muted-border-color, #d9d9d9);
+  border-radius: 10px;
+  padding: 0 0.4rem;
+}
+
+.issue-state-closed {
+  font-size: 0.75rem;
+  color: #8250df;
+  border: 1px solid #8250df;
+  border-radius: 10px;
+  padding: 0 0.4rem;
+}
+
+.label-pill {
+  font-size: 0.75rem;
+  background-color: var(--label-color, #e4e669);
+  color: #1f2430;
+  border-radius: 10px;
+  padding: 0 0.4rem;
+}
+
+.blocked-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #cf222e;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 0.4rem;
+}
+
+.issue-empty {
+  padding: 1rem;
+  color: var(--pico-muted-color, #646b79);
+  text-align: center;
+}

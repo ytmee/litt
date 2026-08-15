@@ -20,3 +20,4 @@
 - **Ready**: A derived query: `state=open` + label `ready-for-agent` + no incoming `issue_blocks` from open issues.
 - **MCP**: Model Context Protocol — the interface AI agents use to interact with litt.
 - **CLI**: The command-line interface humans use.
+- **WebUI**: The read-dominant browser interface humans use to inspect the task graph and perform light operations (create, close, label, comment, blocking). Complements CLI and MCP.
