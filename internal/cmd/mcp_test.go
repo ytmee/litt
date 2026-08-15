@@ -763,5 +763,3 @@ func TestMCPUnknownTool(t *testing.T) {
 		t.Fatal("expected error for unknown tool")
 	}
 }
-
-

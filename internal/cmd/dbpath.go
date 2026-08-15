@@ -52,4 +52,3 @@ func openStore(cmd *cobra.Command) (*store.Store, error) {
 	}
 	return s, nil
 }
-

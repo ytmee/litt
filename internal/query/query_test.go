@@ -8,10 +8,10 @@ import (
 )
 
 type mockReader struct {
-	issues        []store.Issue
-	blockedBy     map[int][]store.Issue
-	blocking      map[int][]store.Issue
-	blockErr      error
+	issues    []store.Issue
+	blockedBy map[int][]store.Issue
+	blocking  map[int][]store.Issue
+	blockErr  error
 }
 
 func (m *mockReader) ListBlockedBy(issueID int) ([]store.Issue, error) {

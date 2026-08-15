@@ -321,16 +321,16 @@ type Comment struct {
 }
 
 type Issue struct {
-	ID            int      `json:"number"`
-	Title         string   `json:"title"`
-	Body          string   `json:"body"`
-	State         string   `json:"state"`
-	Kind          string   `json:"kind"`
-	ParentIssueID *int     `json:"parent_issue_id"`
-	Labels        []Label  `json:"labels"`
-	CreatedAt     string   `json:"created_at"`
-	UpdatedAt     string   `json:"updated_at"`
-	ClosedAt      *string  `json:"closed_at"`
+	ID            int     `json:"number"`
+	Title         string  `json:"title"`
+	Body          string  `json:"body"`
+	State         string  `json:"state"`
+	Kind          string  `json:"kind"`
+	ParentIssueID *int    `json:"parent_issue_id"`
+	Labels        []Label `json:"labels"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	ClosedAt      *string `json:"closed_at"`
 }
 
 func (i Issue) MarshalJSON() ([]byte, error) {
