@@ -33,17 +33,17 @@
       <label for="title">Title</label>
       <input type="text" id="title" name="title" value="{{.Title}}" required autofocus>
 
-      <label for="kind">Kind</label>
-      <select id="kind" name="kind">
-        <option value="spec"{{if eq .Kind "spec"}} selected{{end}}>spec</option>
-        <option value="task"{{if eq .Kind "task"}} selected{{end}}>task</option>
-        <option value="bug"{{if eq .Kind "bug"}} selected{{end}}>bug</option>
-      </select>
+      <fieldset class="kind-options">
+        <legend>Kind</legend>
+        <label><input type="radio" name="kind" value="spec"{{if eq .Kind "spec"}} checked{{end}}> spec</label>
+        <label><input type="radio" name="kind" value="task"{{if or (eq .Kind "task") (eq .Kind "")}} checked{{end}}> task</label>
+        <label><input type="radio" name="kind" value="bug"{{if eq .Kind "bug"}} checked{{end}}> bug</label>
+      </fieldset>
 
       <label for="body">Body</label>
       <textarea id="body" name="body" rows="8">{{.Body}}</textarea>
 
-      <fieldset>
+      <fieldset class="label-options">
         <legend>Labels</legend>
         {{range .Labels}}
         <label>

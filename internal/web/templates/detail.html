@@ -39,43 +39,6 @@
           </hgroup>
         </header>
 
-        <div class="issue-actions">
-          {{if eq .Issue.State "open"}}
-          <form method="post" action="/issues/{{.Issue.ID}}/state">
-            <input type="hidden" name="csrf" value="{{.CSRF}}">
-            <input type="hidden" name="state" value="closed">
-            <button type="submit" class="secondary">Close issue</button>
-          </form>
-          {{else}}
-          <form method="post" action="/issues/{{.Issue.ID}}/state">
-            <input type="hidden" name="csrf" value="{{.CSRF}}">
-            <input type="hidden" name="state" value="open">
-            <button type="submit">Reopen issue</button>
-          </form>
-          {{end}}
-
-          {{range .Issue.Labels}}
-          <form method="post" action="/issues/{{$.Issue.ID}}/labels" class="label-remove">
-            <input type="hidden" name="csrf" value="{{$.CSRF}}">
-            <input type="hidden" name="remove" value="{{.Name}}">
-            <span class="label-pill" style="--label-color:#{{.Color}}">{{.Name}}</span>
-            <button type="submit" class="label-remove-btn" aria-label="Remove label {{.Name}}" title="Remove label {{.Name}}">×</button>
-          </form>
-          {{end}}
-
-          {{if .AddableLabels}}
-          <form method="post" action="/issues/{{.Issue.ID}}/labels" class="litt-addlabel">
-            <input type="hidden" name="csrf" value="{{.CSRF}}">
-            <select name="add" aria-label="Add label">
-              {{range .AddableLabels}}
-              <option value="{{.Name}}">{{.Name}}</option>
-              {{end}}
-            </select>
-            <button type="submit">Add label</button>
-          </form>
-          {{end}}
-        </div>
-
         <article class="markdown-body">
           {{.BodyHTML}}
         </article>
@@ -100,6 +63,46 @@
 
       <aside class="detail-sidebar">
         {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+        <section class="issue-control-panel">
+          <h4>Actions</h4>
+          <div class="issue-actions">
+            {{if eq .Issue.State "open"}}
+            <form method="post" action="/issues/{{.Issue.ID}}/state">
+              <input type="hidden" name="csrf" value="{{.CSRF}}">
+              <input type="hidden" name="state" value="closed">
+              <button type="submit" class="secondary">Close issue</button>
+            </form>
+            {{else}}
+            <form method="post" action="/issues/{{.Issue.ID}}/state">
+              <input type="hidden" name="csrf" value="{{.CSRF}}">
+              <input type="hidden" name="state" value="open">
+              <button type="submit">Reopen issue</button>
+            </form>
+            {{end}}
+
+            {{range .Issue.Labels}}
+            <form method="post" action="/issues/{{$.Issue.ID}}/labels" class="label-remove">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}">
+              <input type="hidden" name="remove" value="{{.Name}}">
+              <span class="label-pill" style="--label-color:#{{.Color}}">{{.Name}}</span>
+              <button type="submit" class="label-remove-btn" aria-label="Remove label {{.Name}}" title="Remove label {{.Name}}">×</button>
+            </form>
+            {{end}}
+
+            {{if .AddableLabels}}
+            <form method="post" action="/issues/{{.Issue.ID}}/labels" class="litt-addlabel">
+              <input type="hidden" name="csrf" value="{{.CSRF}}">
+              <select name="add" aria-label="Add label">
+                {{range .AddableLabels}}
+                <option value="{{.Name}}">{{.Name}}</option>
+                {{end}}
+              </select>
+              <button type="submit">Add label</button>
+            </form>
+            {{end}}
+          </div>
+        </section>
 
         <section>
           <h4>Blocked by</h4>
