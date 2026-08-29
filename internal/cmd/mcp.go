@@ -199,7 +199,7 @@ func buildMCPServer(ms *mcpServer) *mcp.Server {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_issue",
-		Description: "Get a single litt issue by number",
+		Description: "Get a single litt issue by number. The response includes comment_count: if it is greater than 0, read the issue's comments with get_comments before implementing, as important context or corrections may live there.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input getIssueInput) (*mcp.CallToolResult, any, error) {
 		s := ms.storeForRead()
 		if s == nil {

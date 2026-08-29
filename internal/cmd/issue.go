@@ -149,7 +149,7 @@ func newIssueListCmd() *cobra.Command {
 				return nil
 			}
 
-			cmd.Println("#    State   Kind     Title")
+			cmd.Println("#    State   Kind     Title                    Cmt")
 			for _, issue := range issues {
 				labelNames := make([]string, len(issue.Labels))
 				for j, l := range issue.Labels {
@@ -159,7 +159,7 @@ func newIssueListCmd() *cobra.Command {
 				if len(labelNames) > 0 {
 					labelsStr = " [" + strings.Join(labelNames, ", ") + "]"
 				}
-				cmd.Printf("#%-3d %-7s %-8s %s%s\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr)
+				cmd.Printf("#%-3d %-7s %-8s %s%s  %d\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr, issue.CommentCount)
 			}
 			return nil
 		},
@@ -230,6 +230,7 @@ func newIssueShowCmd() *cobra.Command {
 			cmd.Printf("Created: %s\n", issue.CreatedAt)
 			cmd.Printf("Updated: %s\n", issue.UpdatedAt)
 			cmd.Printf("Closed:  %s\n", closedAtStr)
+			cmd.Printf("Comments: %d\n", issue.CommentCount)
 			return nil
 		},
 	}
@@ -439,7 +440,7 @@ func newIssueChildrenCmd() *cobra.Command {
 				return nil
 			}
 
-			cmd.Println("#    State   Kind     Title")
+			cmd.Println("#    State   Kind     Title                    Cmt")
 			for _, issue := range children {
 				labelNames := make([]string, len(issue.Labels))
 				for j, l := range issue.Labels {
@@ -449,7 +450,7 @@ func newIssueChildrenCmd() *cobra.Command {
 				if len(labelNames) > 0 {
 					labelsStr = " [" + strings.Join(labelNames, ", ") + "]"
 				}
-				cmd.Printf("#%-3d %-7s %-8s %s%s\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr)
+				cmd.Printf("#%-3d %-7s %-8s %s%s  %d\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr, issue.CommentCount)
 			}
 			return nil
 		},
@@ -626,7 +627,7 @@ func newIssueReadyCmd() *cobra.Command {
 				return nil
 			}
 
-			cmd.Println("#    State   Kind     Title")
+			cmd.Println("#    State   Kind     Title                    Cmt")
 			for _, issue := range issues {
 				labelNames := make([]string, len(issue.Labels))
 				for j, l := range issue.Labels {
@@ -636,7 +637,7 @@ func newIssueReadyCmd() *cobra.Command {
 				if len(labelNames) > 0 {
 					labelsStr = " [" + strings.Join(labelNames, ", ") + "]"
 				}
-				cmd.Printf("#%-3d %-7s %-8s %s%s\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr)
+				cmd.Printf("#%-3d %-7s %-8s %s%s  %d\n", issue.ID, issue.State, issue.Kind, issue.Title, labelsStr, issue.CommentCount)
 			}
 			return nil
 		},

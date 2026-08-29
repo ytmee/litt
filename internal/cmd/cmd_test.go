@@ -674,6 +674,78 @@ func TestIssueShowJSON(t *testing.T) {
 	}
 }
 
+func TestIssueShowCommentCount(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Test issue", "--body", "details"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "comment", "1", "A note"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "show", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Comments: 1") {
+		t.Fatalf("expected 'Comments: 1' in show output, got: %s", out)
+	}
+}
+
+func TestIssueListCommentCount(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Test issue"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "comment", "1", "A note"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Cmt") {
+		t.Fatalf("expected 'Cmt' column header in list output, got: %s", out)
+	}
+	if !strings.Contains(out, "1") {
+		t.Fatalf("expected comment count in list output, got: %s", out)
+	}
+}
+
+func TestIssueShowJSONCommentCount(t *testing.T) {
+	dir := t.TempDir()
+	defer chdir(t, dir)()
+
+	if _, err := runCmd(t, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "create", "Test issue"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCmd(t, "issue", "comment", "1", "A note"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "issue", "show", "1", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"comment_count":1`) && !strings.Contains(out, `"comment_count": 1`) {
+		t.Fatalf("expected comment_count 1 in JSON output, got: %s", out)
+	}
+}
+
 func TestIssueUpdateTitle(t *testing.T) {
 	dir := t.TempDir()
 	defer chdir(t, dir)()

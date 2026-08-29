@@ -243,6 +243,10 @@ type retryConfig struct {
 	jitterPct   float64
 }
 
+// commentCountExpr is the correlated subquery that counts an issue's comments.
+// It assumes the issues table is aliased as `i` in the surrounding query.
+const commentCountExpr = "(SELECT COUNT(*) FROM comments WHERE issue_id = i.id) AS comment_count"
+
 var defaultRetry = retryConfig{
 	maxAttempts: 6,
 	baseDelay:   50 * time.Millisecond,
@@ -315,6 +319,7 @@ type Issue struct {
 	Kind          string   `json:"kind"`
 	ParentIssueID *int     `json:"parent_issue_id"`
 	Labels        []Label  `json:"labels"`
+	CommentCount  int      `json:"comment_count"`
 	CreatedAt     string   `json:"created_at"`
 	UpdatedAt     string   `json:"updated_at"`
 	ClosedAt      *string  `json:"closed_at"`
@@ -478,11 +483,12 @@ func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (issu
 
 func (s *Store) GetIssue(id int) (*Issue, error) {
 	row := s.readDB.QueryRow(
-		`SELECT id, title, body, state, kind, parent_issue_id, created_at, updated_at, closed_at
-		 FROM issues WHERE id = ?`, id,
+		`SELECT id, title, body, state, kind, parent_issue_id, created_at, updated_at, closed_at,
+			`+commentCountExpr+`
+		 FROM issues i WHERE id = ?`, id,
 	)
 	var issue Issue
-	err := row.Scan(&issue.ID, &issue.Title, &issue.Body, &issue.State, &issue.Kind, &issue.ParentIssueID, &issue.CreatedAt, &issue.UpdatedAt, &issue.ClosedAt)
+	err := row.Scan(&issue.ID, &issue.Title, &issue.Body, &issue.State, &issue.Kind, &issue.ParentIssueID, &issue.CreatedAt, &issue.UpdatedAt, &issue.ClosedAt, &issue.CommentCount)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("issue %d not found", id)
 	}
@@ -498,7 +504,8 @@ func (s *Store) GetIssue(id int) (*Issue, error) {
 }
 
 func (s *Store) ListIssues(state, kind, label string, parentID *int, isBlocked *bool) ([]Issue, error) {
-	query := `SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at FROM issues i`
+	query := `SELECT DISTINCT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at,
+			` + commentCountExpr + ` FROM issues i`
 	var args []interface{}
 	var conditions []string
 
@@ -549,7 +556,7 @@ func (s *Store) ListIssues(state, kind, label string, parentID *int, isBlocked *
 	issues := make([]Issue, 0)
 	for rows.Next() {
 		var i Issue
-		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt, &i.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan issue: %w", err)
 		}
 		issues = append(issues, i)
@@ -785,7 +792,8 @@ func (s *Store) RemoveBlock(blockerID, blockedID int) error {
 
 func (s *Store) ListBlockedBy(issueID int) ([]Issue, error) {
 	rows, err := s.readDB.Query(
-		`SELECT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at
+		`SELECT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at,
+			` + commentCountExpr + `
 		 FROM issues i
 		 JOIN issue_blocks ib ON i.id = ib.blocker_issue_id
 		 WHERE ib.blocked_issue_id = ?
@@ -798,7 +806,7 @@ func (s *Store) ListBlockedBy(issueID int) ([]Issue, error) {
 	issues := make([]Issue, 0)
 	for rows.Next() {
 		var i Issue
-		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt, &i.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan blocked by issue: %w", err)
 		}
 		issues = append(issues, i)
@@ -818,7 +826,8 @@ func (s *Store) ListBlockedBy(issueID int) ([]Issue, error) {
 
 func (s *Store) ListBlocking(issueID int) ([]Issue, error) {
 	rows, err := s.readDB.Query(
-		`SELECT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at
+		`SELECT i.id, i.title, i.body, i.state, i.kind, i.parent_issue_id, i.created_at, i.updated_at, i.closed_at,
+			` + commentCountExpr + `
 		 FROM issues i
 		 JOIN issue_blocks ib ON i.id = ib.blocked_issue_id
 		 WHERE ib.blocker_issue_id = ?
@@ -831,7 +840,7 @@ func (s *Store) ListBlocking(issueID int) ([]Issue, error) {
 	issues := make([]Issue, 0)
 	for rows.Next() {
 		var i Issue
-		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body, &i.State, &i.Kind, &i.ParentIssueID, &i.CreatedAt, &i.UpdatedAt, &i.ClosedAt, &i.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan blocking issue: %w", err)
 		}
 		issues = append(issues, i)

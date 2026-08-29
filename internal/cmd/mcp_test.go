@@ -206,6 +206,47 @@ func TestMCPGetIssueNotFound(t *testing.T) {
 	}
 }
 
+func TestMCPGetIssueCommentCount(t *testing.T) {
+	s, session, cleanup := mcpTestSetup(t)
+	defer cleanup()
+
+	_, err := s.CreateIssue("Test", "task", "body", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(1, "First"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(1, "Second"); err != nil {
+		t.Fatal(err)
+	}
+
+	text := mcpToolSuccess(t, session, "get_issue", map[string]any{
+		"number": 1,
+	})
+	if !strings.Contains(text, `"comment_count":2`) && !strings.Contains(text, `"comment_count": 2`) {
+		t.Fatalf("expected comment_count 2 in response, got: %s", text)
+	}
+}
+
+func TestMCPGetReadyIssuesCommentCount(t *testing.T) {
+	s, session, cleanup := mcpTestSetup(t)
+	defer cleanup()
+
+	_, err := s.CreateIssue("Ready", "task", "", []string{"ready-for-agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(1, "Context"); err != nil {
+		t.Fatal(err)
+	}
+
+	text := mcpToolSuccess(t, session, "get_ready_issues", map[string]any{})
+	if !strings.Contains(text, `"comment_count":1`) && !strings.Contains(text, `"comment_count": 1`) {
+		t.Fatalf("expected comment_count 1 in ready issues response, got: %s", text)
+	}
+}
+
 func TestMCPUpdateIssue(t *testing.T) {
 	s, session, cleanup := mcpTestSetup(t)
 	defer cleanup()

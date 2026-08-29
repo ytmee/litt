@@ -270,6 +270,86 @@ func TestGetIssueNotFound(t *testing.T) {
 	}
 }
 
+func TestGetIssueCommentCount(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	issue, err := s.CreateIssue("Test", "task", "body", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issue.CommentCount != 0 {
+		t.Fatalf("expected 0 comments, got %d", issue.CommentCount)
+	}
+
+	if _, err := s.AddComment(issue.ID, "First"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(issue.ID, "Second"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.GetIssue(issue.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CommentCount != 2 {
+		t.Fatalf("expected 2 comments, got %d", got.CommentCount)
+	}
+}
+
+func TestListIssuesCommentCount(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	issue, err := s.CreateIssue("Test", "task", "body", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(issue.ID, "Only"); err != nil {
+		t.Fatal(err)
+	}
+
+	issues, err := s.ListIssues("", "", "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d", len(issues))
+	}
+	if issues[0].CommentCount != 1 {
+		t.Fatalf("expected 1 comment, got %d", issues[0].CommentCount)
+	}
+}
+
+func TestListBlockedByCommentCount(t *testing.T) {
+	s := setup(t)
+	defer s.Close()
+
+	for i := 0; i < 2; i++ {
+		if _, err := s.CreateIssue(fmt.Sprintf("Issue %d", i+1), "task", "", nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.CreateBlock(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddComment(1, "Note"); err != nil {
+		t.Fatal(err)
+	}
+
+	blockers, err := s.ListBlockedBy(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blockers) != 1 {
+		t.Fatalf("expected 1 blocker, got %d", len(blockers))
+	}
+	if blockers[0].CommentCount != 1 {
+		t.Fatalf("expected 1 comment on blocker, got %d", blockers[0].CommentCount)
+	}
+}
+
 func TestListIssuesDefault(t *testing.T) {
 	s := setup(t)
 	defer s.Close()
