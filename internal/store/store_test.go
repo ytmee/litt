@@ -234,6 +234,14 @@ func TestCreateIssueUnknownLabel(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unknown label")
 	}
+
+	var count int
+	if err := s.writeDB.QueryRow("SELECT COUNT(*) FROM issues").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no issue to be created on label error, but found %d", count)
+	}
 }
 
 func TestGetIssue(t *testing.T) {

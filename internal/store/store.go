@@ -455,6 +455,15 @@ func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (issu
 		if err := validateKind(kind); err != nil {
 			return err
 		}
+		labels := make([]*Label, 0, len(labelNames))
+		for _, name := range labelNames {
+			label, findErr := s.FindLabel(name)
+			if findErr != nil {
+				return fmt.Errorf("label %q does not exist", name)
+			}
+			labels = append(labels, label)
+		}
+
 		result, execErr := s.writeDB.Exec(
 			"INSERT INTO issues (title, kind, body) VALUES (?, ?, ?)",
 			title, kind, body,
@@ -465,11 +474,7 @@ func (s *Store) CreateIssue(title, kind, body string, labelNames []string) (issu
 		id, _ := result.LastInsertId()
 		intID := int(id)
 
-		for _, name := range labelNames {
-			label, findErr := s.FindLabel(name)
-			if findErr != nil {
-				return fmt.Errorf("label %q does not exist", name)
-			}
+		for _, label := range labels {
 			if execErr = s.attachLabel(s.writeDB, intID, label); execErr != nil {
 				return execErr
 			}
